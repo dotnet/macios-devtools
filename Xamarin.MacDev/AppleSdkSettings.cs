@@ -144,7 +144,7 @@ namespace Xamarin.MacDev {
 		static AppleSdkSettings ()
 		{
 			var home = Environment.GetFolderPath (Environment.SpecialFolder.UserProfile);
-			var preferences = Path.Combine (home, "Library", "Preferences", "Xamarin");
+			var preferences = Path.Combine (home, "Library", "Preferences", "maui");
 
 			if (!Directory.Exists (preferences))
 				Directory.CreateDirectory (preferences);

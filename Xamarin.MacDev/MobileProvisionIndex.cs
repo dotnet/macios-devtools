@@ -190,15 +190,15 @@ namespace Xamarin.MacDev {
 
 		static MobileProvisionIndex ()
 		{
-			string xamarinFolder;
+			string provisioningFolder;
 
 			if (Environment.OSVersion.Platform == PlatformID.Unix || Environment.OSVersion.Platform == PlatformID.MacOSX) {
-				xamarinFolder = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.UserProfile), "Library", "Xamarin");
+				provisioningFolder = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.UserProfile), "Library", "Caches", "maui");
 			} else {
-				xamarinFolder = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.LocalApplicationData), "Xamarin", "iOS", "Provisioning");
+				provisioningFolder = Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.LocalApplicationData), "maui", "iOS", "Provisioning");
 			}
 
-			IndexFileName = Path.Combine (xamarinFolder, "Provisioning Profiles.index");
+			IndexFileName = Path.Combine (provisioningFolder, "Provisioning Profiles.index");
 		}
 
 		MobileProvisionIndex ()
