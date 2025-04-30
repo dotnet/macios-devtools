@@ -69,7 +69,7 @@ namespace Xamarin.MacDev {
 				var appDataLocal = Environment.GetFolderPath (Environment.SpecialFolder.LocalApplicationData);
 
 				ProfileDirectories = new string [] {
-					Path.Combine (appDataLocal, "Xamarin", "iOS", "Provisioning", "Profiles")
+					Path.Combine (appDataLocal, "maui", "iOS", "Provisioning", "Profiles")
 				};
 			}
 		}
