@@ -78,15 +78,15 @@ namespace Xamarin.MacDev {
 			}
 		}
 
-		public static IEnumerable<KeyValuePair<string?, PObject>> ToEnumerable (PObject obj)
+		public static IEnumerable<KeyValuePair<string, PObject>> ToEnumerable (PObject obj)
 		{
-			if (obj is PDictionary)
-				return (PDictionary) obj;
+			if (obj is PDictionary dict)
+				return dict;
 
-			if (obj is PArray)
-				return ((PArray) obj).Select (k => new KeyValuePair<string?, PObject> (k is IPValueObject ? ((IPValueObject) k).Value.ToString () : null, k));
+			if (obj is PArray array)
+				return array.Select (k => new KeyValuePair<string, PObject> (k is IPValueObject kip ? kip.Value.ToString ()! : null!, k));
 
-			return Enumerable.Empty<KeyValuePair<string?, PObject>> ();
+			return Enumerable.Empty<KeyValuePair<string, PObject>> ();
 		}
 
 		PObjectContainer? parent;
@@ -145,8 +145,11 @@ namespace Xamarin.MacDev {
 
 		public abstract PObjectType Type { get; }
 
-		public static implicit operator PObject (string value)
+		[return: NotNullIfNotNull (nameof (value))]
+		public static implicit operator PObject? (string? value)
 		{
+			if (value is null)
+				return null;
 			return new PString (value);
 		}
 
@@ -170,8 +173,11 @@ namespace Xamarin.MacDev {
 			return new PDate (value);
 		}
 
-		public static implicit operator PObject (byte [] value)
+		[return: NotNullIfNotNull (nameof (value))]
+		public static implicit operator PObject? (byte []? value)
 		{
+			if (value is null)
+				return null;
 			return new PData (value);
 		}
 
@@ -504,9 +510,9 @@ namespace Xamarin.MacDev {
 			Value = value;
 		}
 
-		public static implicit operator T (PValueObject<T> pObj)
+		public static implicit operator T? (PValueObject<T>? pObj)
 		{
-			return pObj is not null ? pObj.Value : default (T)!;
+			return pObj is not null ? pObj.Value : default (T);
 		}
 
 		public abstract bool TrySetValueFromString (string text, IFormatProvider formatProvider);
@@ -515,7 +521,7 @@ namespace Xamarin.MacDev {
 #if !POBJECT_INTERNAL
 	public
 #endif
-	class PDictionary : PObjectContainer, IEnumerable<KeyValuePair<string?, PObject>> {
+	class PDictionary : PObjectContainer, IEnumerable<KeyValuePair<string, PObject>> {
 		static readonly byte [] BeginMarkerBytes = Encoding.ASCII.GetBytes ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
 		static readonly byte [] EndMarkerBytes = Encoding.ASCII.GetBytes ("</plist>");
 
@@ -565,10 +571,10 @@ namespace Xamarin.MacDev {
 		}
 
 		#region IEnumerable[KeyValuePair[System.String,PObject]] implementation
-		public IEnumerator<KeyValuePair<string?, PObject>> GetEnumerator ()
+		public IEnumerator<KeyValuePair<string, PObject>> GetEnumerator ()
 		{
 			foreach (var key in order)
-				yield return new KeyValuePair<string?, PObject> (key, dict [key]);
+				yield return new KeyValuePair<string, PObject> (key, dict [key]);
 		}
 		#endregion
 
