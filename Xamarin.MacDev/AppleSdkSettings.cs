@@ -153,7 +153,7 @@ namespace Xamarin.MacDev {
 					SettingsPath = oldSettings;
 			}
 
-			Directory.Create (Path.GetDirectoryName (SettingsPath));
+			Directory.CreateDirectory (Path.GetDirectoryName (SettingsPath));
 
 			Init ();
 		}
