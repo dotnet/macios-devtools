@@ -12,6 +12,6 @@ jobs:
 
     steps:
     - name: 'Autoformat'
-      uses: rolfbjarne/autoformat@v0.1
+      uses: rolfbjarne/autoformat@v0.5
       with:
         projects: "Xamarin.MacDev.sln"
