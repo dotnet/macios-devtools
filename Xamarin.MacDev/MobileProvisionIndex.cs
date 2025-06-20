@@ -723,28 +723,30 @@ namespace Xamarin.MacDev {
 					continue;
 				}
 
-				foreach (var cert in profile.DeveloperCertificates) {
-					if (!thumbprints.Contains (cert.Thumbprint)) {
-						failures?.Add ($"The profile '{profile.Name}' might not be applicable because its developer certificate (of {profile.DeveloperCertificates.Count} certificates) {cert.Name}'s thumbprint ({cert.Thumbprint}) is not in the list of accepted thumbprints ({string.Join (", ", thumbprints)}).");
-						continue;
-					}
+				var matchingCerts = profile.DeveloperCertificates.Where (cert => thumbprints.Contains (cert.Thumbprint)).ToArray ();
+				if (!matchingCerts.Any ()) {
+					failures?.Add ($"The profile '{profile.Name}' ({profile.ApplicationIdentifier}) is not applicable because none of its developer certificates match the currently available certificates. This provisioning profile has {profile.DeveloperCertificates.Count} certificate(s):");
+					foreach (var cert in profile.DeveloperCertificates)
+						failures?.Add ($"    {cert.Name} ({cert.Thumbprint})");
+				} else {
+					foreach (var cert in matchingCerts) {
+						if (unique) {
+							int idx;
 
-					if (unique) {
-						int idx;
-
-						if (dictionary.TryGetValue (profile.Name, out idx)) {
-							if (profile.CreationDate > list [idx].CreationDate)
-								list [idx] = MobileProvision.LoadFromFile (profile.FileName);
+							if (dictionary.TryGetValue (profile.Name, out idx)) {
+								if (profile.CreationDate > list [idx].CreationDate)
+									list [idx] = MobileProvision.LoadFromFile (profile.FileName);
+							} else {
+								var provision = MobileProvision.LoadFromFile (profile.FileName);
+								dictionary.Add (profile.Name, list.Count);
+								list.Add (provision);
+							}
 						} else {
 							var provision = MobileProvision.LoadFromFile (profile.FileName);
-							dictionary.Add (profile.Name, list.Count);
 							list.Add (provision);
 						}
-					} else {
-						var provision = MobileProvision.LoadFromFile (profile.FileName);
-						list.Add (provision);
+						break;
 					}
-					break;
 				}
 			}
 
