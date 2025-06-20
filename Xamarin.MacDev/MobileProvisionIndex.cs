@@ -723,29 +723,26 @@ namespace Xamarin.MacDev {
 					continue;
 				}
 
-				var matchingCerts = profile.DeveloperCertificates.Where (cert => thumbprints.Contains (cert.Thumbprint)).ToArray ();
-				if (!matchingCerts.Any ()) {
+				var anyMatchingCerts = profile.DeveloperCertificates.Any (cert => thumbprints.Contains (cert.Thumbprint));
+				if (!anyMatchingCerts) {
 					failures?.Add ($"The profile '{profile.Name}' ({profile.ApplicationIdentifier}) is not applicable because none of its developer certificates match the currently available certificates. This provisioning profile has {profile.DeveloperCertificates.Count} certificate(s):");
 					foreach (var cert in profile.DeveloperCertificates)
 						failures?.Add ($"    {cert.Name} ({cert.Thumbprint})");
 				} else {
-					foreach (var cert in matchingCerts) {
-						if (unique) {
-							int idx;
+					if (unique) {
+						int idx;
 
-							if (dictionary.TryGetValue (profile.Name, out idx)) {
-								if (profile.CreationDate > list [idx].CreationDate)
-									list [idx] = MobileProvision.LoadFromFile (profile.FileName);
-							} else {
-								var provision = MobileProvision.LoadFromFile (profile.FileName);
-								dictionary.Add (profile.Name, list.Count);
-								list.Add (provision);
-							}
+						if (dictionary.TryGetValue (profile.Name, out idx)) {
+							if (profile.CreationDate > list [idx].CreationDate)
+								list [idx] = MobileProvision.LoadFromFile (profile.FileName);
 						} else {
 							var provision = MobileProvision.LoadFromFile (profile.FileName);
+							dictionary.Add (profile.Name, list.Count);
 							list.Add (provision);
 						}
-						break;
+					} else {
+						var provision = MobileProvision.LoadFromFile (profile.FileName);
+						list.Add (provision);
 					}
 				}
 			}
