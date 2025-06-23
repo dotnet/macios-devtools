@@ -723,12 +723,12 @@ namespace Xamarin.MacDev {
 					continue;
 				}
 
-				foreach (var cert in profile.DeveloperCertificates) {
-					if (!thumbprints.Contains (cert.Thumbprint)) {
-						failures?.Add ($"The profile '{profile.Name}' might not be applicable because its developer certificate (of {profile.DeveloperCertificates.Count} certificates) {cert.Name}'s thumbprint ({cert.Thumbprint}) is not in the list of accepted thumbprints ({string.Join (", ", thumbprints)}).");
-						continue;
-					}
-
+				var anyMatchingCerts = profile.DeveloperCertificates.Any (cert => thumbprints.Contains (cert.Thumbprint));
+				if (!anyMatchingCerts) {
+					failures?.Add ($"The profile '{profile.Name}' ({profile.ApplicationIdentifier}) is not applicable because none of its developer certificates match the currently available certificates. This provisioning profile has {profile.DeveloperCertificates.Count} certificate(s):");
+					foreach (var cert in profile.DeveloperCertificates)
+						failures?.Add ($"    {cert.Name} ({cert.Thumbprint})");
+				} else {
 					if (unique) {
 						int idx;
 
@@ -744,7 +744,6 @@ namespace Xamarin.MacDev {
 						var provision = MobileProvision.LoadFromFile (profile.FileName);
 						list.Add (provision);
 					}
-					break;
 				}
 			}
 
