@@ -81,7 +81,7 @@ namespace Xamarin.MacDev {
 				if (allKeys == null) {
 					allKeys = typeof (EntitlementKeys).GetFields (BindingFlags.Public | BindingFlags.Static).
 						Where (f => f.FieldType == typeof (string)).
-						Select (field => (string) field.GetValue (null)).
+						Select (f => (string) f.GetValue (null)).
 						ToArray ();
 				}
 
