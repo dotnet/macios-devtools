@@ -510,6 +510,7 @@ namespace Xamarin.MacDev {
 			Value = value;
 		}
 
+		[return: NotNullIfNotNull (nameof (pObj))]
 		public static implicit operator T? (PValueObject<T>? pObj)
 		{
 			return pObj is not null ? pObj.Value : default (T);
