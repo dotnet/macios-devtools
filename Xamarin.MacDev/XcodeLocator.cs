@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 
 #nullable enable
 
@@ -43,11 +44,25 @@ namespace Xamarin.MacDev {
 		/// <summary>If the Xcode location is a symlink or has a parent directory that is a symlink.</summary>
 		public bool IsXcodeSymlink => PathUtils.IsSymlinkOrHasParentSymlink (XcodeLocation);
 
-		/// <summary>Look for the Xcode location in the MD_APPLE_SDK_ROOT or not. Defaults to false.</summary>
-		public bool SupportEnvironmentVariableLookup { get; set; } = false;
+		/// <summary>Look for the Xcode location in the environment variable named <see cref="EnvironmentVariableName" />. Defaults to true at the moment.</summary>
+		public bool SupportEnvironmentVariableLookup { get; set; } = true;
+
+		public bool SystemHasEnvironmentVariable {
+			get => !string.IsNullOrEmpty (Environment.GetEnvironmentVariable (EnvironmentVariableName));
+		}
+
+		public const string EnvironmentVariableName = "MD_APPLE_SDK_ROOT";
 
 		/// <summary>Look for the Xcode location in ~/Library/Preferences/maui/Settings.plist or ~/Library/Preferences/Xamarin/Settings.plist. Defaults to true at the moment.</summary>
 		public bool SupportSettingsFileLookup { get; set; } = true;
+
+		public bool SystemHasSettingsFile {
+			get => SystemExistingSettingsFiles.Any ();
+		}
+
+		public IEnumerable<string> SystemExistingSettingsFiles {
+			get => SettingsPathCandidates.Where (File.Exists);
+		}
 
 		public static IEnumerable<string> SettingsPathCandidates => new string [] {
 			Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.UserProfile), "Library", "Preferences", "maui", "Settings.plist"),
@@ -76,13 +91,13 @@ namespace Xamarin.MacDev {
 			//
 			// A few points:
 			//
-			// 1. I've never seen anyone outside our own code use MD_APPLE_SDK_ROOT, so we don't need to support that, but let's make it opt-in for now.
+			// 1. We've recommended using MD_APPLE_SDK_ROOT in our public documentation, so we should start with making it opt-out, then eventually making it opt-in.
 			// 2. We want to deprecate the settings files, because they just confuse people. Yet we don't want to break people, so make this opt-out for now.
 			// 3. This is good.
 			// 4. Why check something that probably doesn't even exist (if xcode-select --print-path doesn't know about it, it probably doesn't work).
 
-			// 1. This is opt-in
-			if (SupportEnvironmentVariableLookup && TryLocatingSpecificXcode (Environment.GetEnvironmentVariable ("MD_APPLE_SDK_ROOT"), out var location)) {
+			// 1. This is opt-out
+			if (SupportEnvironmentVariableLookup && TryLocatingSpecificXcode (Environment.GetEnvironmentVariable (EnvironmentVariableName), out var location)) {
 				XcodeLocation = location;
 				return true;
 			}
