@@ -78,6 +78,7 @@ namespace Xamarin.MacDev {
 		{
 			// First try the override.
 			if (TryLocatingSpecificXcode (xcodeLocationOverride, out var canonicalizedXcodePath)) {
+				log.LogInfo ("Found the valid Xcode using the MSBuild override (the 'XcodeLocation' property).");
 				XcodeLocation = canonicalizedXcodePath;
 				return true;
 			}
@@ -98,6 +99,7 @@ namespace Xamarin.MacDev {
 
 			// 1. This is opt-out
 			if (SupportEnvironmentVariableLookup && TryLocatingSpecificXcode (Environment.GetEnvironmentVariable (EnvironmentVariableName), out var location)) {
+				log.LogInfo ($"Found the valid Xcode in the environment variable '{EnvironmentVariableName}'.");
 				XcodeLocation = location;
 				return true;
 			}
@@ -108,6 +110,7 @@ namespace Xamarin.MacDev {
 					if (!TryReadSettingsPath (log, candidate, out var sdkLocation))
 						continue;
 					if (TryLocatingSpecificXcode (sdkLocation, out location)) {
+						log.LogInfo ($"Found the valid Xcode in the settings file '{candidate}'.");
 						XcodeLocation = location;
 						return true;
 					}
@@ -116,9 +119,12 @@ namespace Xamarin.MacDev {
 
 			// 3. Not optional
 			if (TryGetSystemXcode (log, out location)) {
+				log.LogInfo ($"Found the valid Xcode from the system settings ('xcode-select -p').");
 				XcodeLocation = location;
 				return true;
 			}
+
+			log.LogInfo ($"Did not find a valid Xcode.");
 
 			// 4. Nope
 			return false;
