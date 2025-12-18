@@ -670,6 +670,17 @@ namespace Xamarin.MacDev {
 			return false;
 		}
 
+		public bool TryGetStringValue (string key, [NotNullWhen (true)] out string? value)
+		{
+			if (TryGetValue<PString> (key, out var obj)) {
+				value = obj.Value;
+				return true;
+			}
+
+			value = null;
+			return false;
+		}
+
 #if POBJECT_MONOMAC
 		public override NSObject Convert ()
 		{
