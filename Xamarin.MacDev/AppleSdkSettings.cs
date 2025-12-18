@@ -144,12 +144,16 @@ namespace Xamarin.MacDev {
 		static AppleSdkSettings ()
 		{
 			var home = Environment.GetFolderPath (Environment.SpecialFolder.UserProfile);
-			var preferences = Path.Combine (home, "Library", "Preferences", "maui");
 
-			if (!Directory.Exists (preferences))
-				Directory.CreateDirectory (preferences);
+			SettingsPath = Path.Combine (home, "Library", "Preferences", "maui", "Settings.plist");
 
-			SettingsPath = Path.Combine (preferences, "Settings.plist");
+			if (!File.Exists (SettingsPath)) {
+				var oldSettings = Path.Combine (home, "Library", "Preferences", "Xamarin", "Settings.plist");
+				if (File.Exists (oldSettings))
+					SettingsPath = oldSettings;
+			}
+
+			Directory.CreateDirectory (Path.GetDirectoryName (SettingsPath));
 
 			Init ();
 		}

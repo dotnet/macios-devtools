@@ -69,6 +69,7 @@ namespace Xamarin.MacDev {
 				var appDataLocal = Environment.GetFolderPath (Environment.SpecialFolder.LocalApplicationData);
 
 				ProfileDirectories = new string [] {
+					Path.Combine (appDataLocal, "Xamarin", "iOS", "Provisioning", "Profiles"),
 					Path.Combine (appDataLocal, "maui", "iOS", "Provisioning", "Profiles")
 				};
 			}
@@ -130,7 +131,7 @@ namespace Xamarin.MacDev {
 				}
 			}
 
-			LoggingService.LogInfo ($"Loaded provisioning profile from '{fileName}'");
+			LoggingService.LogInfo ($"Loaded provisioning profile '{m.Name}' from '{fileName}'");
 
 			return m;
 		}
