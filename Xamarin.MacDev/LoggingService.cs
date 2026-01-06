@@ -72,7 +72,63 @@ namespace Xamarin.MacDev {
 	public interface ICustomLogger {
 		void LogError (string message, Exception ex);
 		void LogWarning (string messageFormat, params object [] args);
-		void LogInfo (string messageFormat, object [] args);
+		void LogInfo (string messageFormat, params object [] args);
 		void LogDebug (string messageFormat, params object [] args);
+	}
+
+#nullable enable
+	// This is a logger that prints to Console.[Error.]WriteLine.
+	public class ConsoleLogger : ICustomLogger {
+		public static ConsoleLogger Instance = new ();
+
+		public void LogError (string message, Exception? ex)
+		{
+			if (ex is null) {
+				Console.Error.WriteLine ($"Error: {message}");
+			} else {
+				Console.Error.WriteLine ($"Error: {message} ({ex})");
+			}
+		}
+
+		public void LogWarning (string messageFormat, params object [] args)
+		{
+			Console.WriteLine ("Warning: " + messageFormat, args);
+		}
+
+		public void LogInfo (string messageFormat, params object [] args)
+		{
+			Console.WriteLine ("Info: " + messageFormat, args);
+		}
+
+		public void LogDebug (string messageFormat, params object [] args)
+		{
+			Console.WriteLine ("Debug: " + messageFormat, args);
+		}
+	}
+
+	// This is a logger that just calls the static LoggingService class.
+	// To be used only until all code can switch away from static state.
+	public class LoggingServiceLogger : ICustomLogger {
+		public static LoggingServiceLogger Instance = new ();
+
+		public void LogError (string message, Exception? ex)
+		{
+			LoggingService.LogError (message, ex);
+		}
+
+		public void LogWarning (string messageFormat, params object [] args)
+		{
+			LoggingService.LogWarning (messageFormat, args);
+		}
+
+		public void LogInfo (string messageFormat, params object [] args)
+		{
+			LoggingService.LogInfo (messageFormat, args);
+		}
+
+		public void LogDebug (string messageFormat, params object [] args)
+		{
+			LoggingService.LogDebug (messageFormat, args);
+		}
 	}
 }
