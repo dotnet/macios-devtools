@@ -220,7 +220,11 @@ namespace Xamarin.MacDev {
 				var data = item as PData;
 
 				if (data != null)
+#if NET9_0_OR_GREATER
+					list.Add (X509CertificateLoader.LoadCertificate (data.Value));
+#else
 					list.Add (new X509Certificate2 (data.Value));
+#endif
 			}
 
 			return list;
