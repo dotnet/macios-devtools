@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public class ExtendedVersion {
 		public Version Version { get; set; }

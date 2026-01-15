@@ -12,6 +12,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public sealed class XamMacSdk : IMonoMacSdk {
 		static readonly AppleSdkVersion [] MacOSXSdkVersions = {

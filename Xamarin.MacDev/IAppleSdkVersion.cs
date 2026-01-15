@@ -1,4 +1,8 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+
+#nullable enable
+
 namespace Xamarin.MacDev {
 	public interface IAppleSdkVersion : IEquatable<IAppleSdkVersion> {
 		bool IsUseDefault { get; }
@@ -19,7 +23,11 @@ namespace Xamarin.MacDev {
 			return v.Count > 0 ? v [v.Count - 1] : @this.GetUseDefault ();
 		}
 
-		public static bool TryParse (string s, out int [] result)
+#if NET
+		public static bool TryParse (string? s, [NotNullWhen (true)] out int []? result)
+#else
+		public static bool TryParse (string? s, out int []? result)
+#endif
 		{
 			if (s == null) {
 				result = null;
@@ -40,7 +48,7 @@ namespace Xamarin.MacDev {
 			return true;
 		}
 
-		public static bool TryParse<T> (string s, out T result) where T : IAppleSdkVersion, new()
+		public static bool TryParse<T> (string? s, out T result) where T : IAppleSdkVersion, new()
 		{
 			result = new T ();
 			if (s == null)
@@ -49,7 +57,11 @@ namespace Xamarin.MacDev {
 			if (!TryParse (s, out var vint))
 				return false;
 
+#if NET
 			result.SetVersion (vint);
+#else
+			result.SetVersion (vint!);
+#endif
 			return true;
 		}
 
@@ -73,11 +85,14 @@ namespace Xamarin.MacDev {
 
 		public static bool Equals (IAppleSdkVersion a, IAppleSdkVersion b)
 		{
-			if ((object) a == (object) b)
+			if (a is null && b is null)
 				return true;
 
-			if (a != null ^ b != null)
+			if (a is null || b is null)
 				return false;
+
+			if ((object) a == (object) b)
+				return true;
 
 			var x = a.Version;
 			var y = b.Version;

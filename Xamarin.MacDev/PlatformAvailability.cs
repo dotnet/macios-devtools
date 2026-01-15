@@ -19,6 +19,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	[Flags]
 	public enum PlatformArchitecture : byte {

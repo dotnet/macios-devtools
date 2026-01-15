@@ -29,6 +29,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public static class AppleSdkSettings {
 		static readonly string SettingsPath;
