@@ -10,6 +10,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public static class EntitlementKeys {
 		public const string SystemExtension = "com.apple.developer.system-extension.install";

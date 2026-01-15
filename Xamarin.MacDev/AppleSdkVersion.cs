@@ -28,6 +28,9 @@
 
 using System;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public struct AppleSdkVersion : IComparable<AppleSdkVersion>, IEquatable<AppleSdkVersion>, IAppleSdkVersion {
 		int [] version;

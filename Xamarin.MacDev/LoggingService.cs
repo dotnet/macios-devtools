@@ -26,6 +26,9 @@
 using System;
 using System.Diagnostics;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public static class LoggingService {
 		static ICustomLogger Logger;
