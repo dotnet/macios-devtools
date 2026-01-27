@@ -33,6 +33,9 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public class Keychain {
 		const string CoreFoundationLib = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation";
@@ -458,7 +461,11 @@ namespace Xamarin.MacDev {
 
 					if (rawData != null) {
 						try {
+#if NET9_0_OR_GREATER
+							certificate = X509CertificateLoader.LoadCertificate (rawData);
+#else
 							certificate = new X509Certificate2 (rawData);
+#endif
 						} catch (Exception ex) {
 							LoggingService.LogWarning ("Error loading signing certificate from keychain", ex);
 						}
@@ -515,7 +522,11 @@ namespace Xamarin.MacDev {
 
 					if (rawData != null) {
 						try {
+#if NET9_0_OR_GREATER
+							certs.Add (X509CertificateLoader.LoadCertificate (rawData));
+#else
 							certs.Add (new X509Certificate2 (rawData));
+#endif
 						} catch (Exception ex) {
 							LoggingService.LogWarning ("Error loading signing certificate from keychain", ex);
 						}

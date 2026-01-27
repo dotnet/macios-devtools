@@ -26,6 +26,9 @@
 
 using System.Collections.Generic;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public class AppleIPhoneSdk : AppleSdk {
 		protected override string SimulatorPlatformName {

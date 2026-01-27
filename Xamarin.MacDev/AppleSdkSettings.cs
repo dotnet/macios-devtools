@@ -29,6 +29,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	[Obsolete ("Use 'XcodeLocator' instead, this class keeps static state, which causes various problems when the state isn't updated.")]
 	public static class AppleSdkSettings {

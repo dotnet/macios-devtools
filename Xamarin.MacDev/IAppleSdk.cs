@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+#nullable enable
+
 namespace Xamarin.MacDev {
 	public interface IAppleSdk {
 		bool IsInstalled { get; }

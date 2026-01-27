@@ -29,6 +29,9 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public class MobileProvisionIndex {
 		static readonly string IndexFileName;

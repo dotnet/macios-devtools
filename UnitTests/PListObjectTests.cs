@@ -87,7 +87,11 @@ namespace UnitTests {
 
 			using (var stream = GetType ().Assembly.GetManifestResourceStream ("UnitTests.TestData.PropertyLists.xml-integers.plist")) {
 				var buffer = new byte [stream.Length];
+#if NET7_0_OR_GREATER
+				stream.ReadExactly (buffer, 0, buffer.Length);
+#else
 				stream.Read (buffer, 0, buffer.Length);
+#endif
 
 				expected = Encoding.UTF8.GetString (buffer);
 			}
@@ -116,6 +120,25 @@ namespace UnitTests {
 				var integer = (PNumber) value;
 				Assert.That (integer.Value, Is.EqualTo (kvp.Value));
 			}
+		}
+
+		[Test]
+		public void TestStrings ()
+		{
+			PDictionary plist;
+
+			using (var stream = GetType ().Assembly.GetManifestResourceStream ($"UnitTests.TestData.PropertyLists.strings.plist"))
+				plist = (PDictionary) PObject.FromStream (stream);
+
+			Assert.That (plist.Count, Is.EqualTo (2));
+
+			Assert.That (plist.TryGetValue<PString> ("KeyA", out var valueA), Is.True);
+			Assert.That (valueA.Value, Is.EqualTo ("ValueA"));
+			Assert.That (plist.TryGetStringValue ("KeyA", out var valueAString));
+			Assert.That (valueAString, Is.EqualTo ("ValueA"));
+
+			Assert.That (plist.TryGetStringValue ("✅", out var emojiValue), Is.True);
+			Assert.That (emojiValue, Is.EqualTo ("❌"));
 		}
 	}
 }

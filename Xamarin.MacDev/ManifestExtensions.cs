@@ -26,6 +26,9 @@
 using System;
 using System.Linq;
 
+// Disable until we get around to enable + fix any issues.
+#nullable disable
+
 namespace Xamarin.MacDev {
 	public static class ManifestExtensions {
 		#region CoreFoundation Manifest Keys
