@@ -33,6 +33,7 @@ using System.IO;
 #nullable disable
 
 namespace Xamarin.MacDev {
+	[Obsolete ("Use 'XcodeLocator' instead, this class keeps static state, which causes various problems when the state isn't updated.")]
 	public static class AppleSdkSettings {
 		static readonly string SettingsPath;
 
@@ -107,23 +108,11 @@ namespace Xamarin.MacDev {
 
 		public static string GetConfiguredSdkLocation ()
 		{
-			PDictionary plist = null;
-			PString value;
-
-			try {
-				if (File.Exists (SettingsPath))
-					plist = PDictionary.FromFile (SettingsPath, out var _);
-			} catch (FileNotFoundException) {
-			}
-
-			// First try the configured location in Visual Studio
-			if (plist != null && plist.TryGetValue ("AppleSdkRoot", out value) && !string.IsNullOrEmpty (value?.Value)) {
-				LoggingService.LogInfo (string.Format ("An Xcode location was found in the file '{0}': {1}", SettingsPath, value.Value));
-				return value.Value;
-			}
+			if (XcodeLocator.TryReadSettingsPath (LoggingServiceLogger.Instance, SettingsPath, out var path))
+				return path;
 
 			// Then check the system's default Xcode
-			if (TryGetSystemXcode (out var path))
+			if (TryGetSystemXcode (out path))
 				return path;
 
 			// Finally return the hardcoded default
@@ -146,14 +135,11 @@ namespace Xamarin.MacDev {
 
 		static AppleSdkSettings ()
 		{
-			var home = Environment.GetFolderPath (Environment.SpecialFolder.UserProfile);
-
-			SettingsPath = Path.Combine (home, "Library", "Preferences", "maui", "Settings.plist");
-
-			if (!File.Exists (SettingsPath)) {
-				var oldSettings = Path.Combine (home, "Library", "Preferences", "Xamarin", "Settings.plist");
-				if (File.Exists (oldSettings))
-					SettingsPath = oldSettings;
+			foreach (var path in XcodeLocator.SettingsPathCandidates) {
+				if (!File.Exists (path))
+					continue;
+				SettingsPath = path;
+				break;
 			}
 
 			Directory.CreateDirectory (Path.GetDirectoryName (SettingsPath));
@@ -163,37 +149,7 @@ namespace Xamarin.MacDev {
 
 		public static bool TryGetSystemXcode (out string path)
 		{
-			path = null;
-			if (!File.Exists ("/usr/bin/xcode-select"))
-				return false;
-
-			try {
-				using var process = new Process ();
-				process.StartInfo.FileName = "/usr/bin/xcode-select";
-				process.StartInfo.Arguments = "--print-path";
-				process.StartInfo.RedirectStandardOutput = true;
-				process.StartInfo.UseShellExecute = false;
-				process.Start ();
-				var stdout = process.StandardOutput.ReadToEnd ();
-				process.WaitForExit ();
-
-				stdout = stdout.Trim ();
-				if (Directory.Exists (stdout)) {
-					if (stdout.EndsWith ("/Contents/Developer", StringComparison.Ordinal))
-						stdout = stdout.Substring (0, stdout.Length - "/Contents/Developer".Length);
-
-					path = stdout;
-					LoggingService.LogInfo (string.Format ("Using the Xcode location configured for this system (found using 'xcode-select -p'): {0}", path));
-					return true;
-				}
-
-				LoggingService.LogInfo ("The system's Xcode location {0} does not exist", stdout);
-
-				return false;
-			} catch (Exception e) {
-				LoggingService.LogInfo ("Could not get the system's Xcode location: {0}", e);
-				return false;
-			}
+			return XcodeLocator.TryGetSystemXcode (LoggingServiceLogger.Instance, out path);
 		}
 
 		public static void Init ()
