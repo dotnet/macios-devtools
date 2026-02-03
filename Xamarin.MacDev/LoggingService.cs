@@ -78,7 +78,7 @@ namespace Xamarin.MacDev {
 		void LogError (string message, Exception? ex);
 		void LogWarning (string messageFormat, params object? [] args);
 		void LogInfo (string messageFormat, params object? [] args);
-		void LogDebug (string messageFormat, params object ?[] args);
+		void LogDebug (string messageFormat, params object? [] args);
 	}
 
 	// This is a logger that prints to Console.[Error.]WriteLine.
