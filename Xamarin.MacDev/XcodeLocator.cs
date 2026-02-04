@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 
 #nullable enable
 
@@ -43,11 +44,25 @@ namespace Xamarin.MacDev {
 		/// <summary>If the Xcode location is a symlink or has a parent directory that is a symlink.</summary>
 		public bool IsXcodeSymlink => PathUtils.IsSymlinkOrHasParentSymlink (XcodeLocation);
 
-		/// <summary>Look for the Xcode location in the MD_APPLE_SDK_ROOT or not. Defaults to false.</summary>
-		public bool SupportEnvironmentVariableLookup { get; set; } = false;
+		/// <summary>Look for the Xcode location in the environment variable named <see cref="EnvironmentVariableName" />.</summary>
+		public bool SupportEnvironmentVariableLookup { get; set; }
 
-		/// <summary>Look for the Xcode location in ~/Library/Preferences/maui/Settings.plist or ~/Library/Preferences/Xamarin/Settings.plist. Defaults to true at the moment.</summary>
-		public bool SupportSettingsFileLookup { get; set; } = true;
+		public bool SystemHasEnvironmentVariable {
+			get => !string.IsNullOrEmpty (Environment.GetEnvironmentVariable (EnvironmentVariableName));
+		}
+
+		public const string EnvironmentVariableName = "MD_APPLE_SDK_ROOT";
+
+		/// <summary>Look for the Xcode location in ~/Library/Preferences/maui/Settings.plist or ~/Library/Preferences/Xamarin/Settings.plist.</summary>
+		public bool SupportSettingsFileLookup { get; set; }
+
+		public bool SystemHasSettingsFile {
+			get => SystemExistingSettingsFiles.Any ();
+		}
+
+		public IEnumerable<string> SystemExistingSettingsFiles {
+			get => SettingsPathCandidates.Where (File.Exists);
+		}
 
 		public static IEnumerable<string> SettingsPathCandidates => new string [] {
 			Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.UserProfile), "Library", "Preferences", "maui", "Settings.plist"),
@@ -63,6 +78,7 @@ namespace Xamarin.MacDev {
 		{
 			// First try the override.
 			if (TryLocatingSpecificXcode (xcodeLocationOverride, out var canonicalizedXcodePath)) {
+				log.LogInfo ("Found a valid Xcode using the MSBuild override (the 'XcodeLocation' property).");
 				XcodeLocation = canonicalizedXcodePath;
 				return true;
 			}
@@ -76,13 +92,14 @@ namespace Xamarin.MacDev {
 			//
 			// A few points:
 			//
-			// 1. I've never seen anyone outside our own code use MD_APPLE_SDK_ROOT, so we don't need to support that, but let's make it opt-in for now.
+			// 1. We've recommended using MD_APPLE_SDK_ROOT in our public documentation, so we should start with making it opt-out, then eventually making it opt-in.
 			// 2. We want to deprecate the settings files, because they just confuse people. Yet we don't want to break people, so make this opt-out for now.
 			// 3. This is good.
 			// 4. Why check something that probably doesn't even exist (if xcode-select --print-path doesn't know about it, it probably doesn't work).
 
-			// 1. This is opt-in
-			if (SupportEnvironmentVariableLookup && TryLocatingSpecificXcode (Environment.GetEnvironmentVariable ("MD_APPLE_SDK_ROOT"), out var location)) {
+			// 1. This is opt-out
+			if (SupportEnvironmentVariableLookup && TryLocatingSpecificXcode (Environment.GetEnvironmentVariable (EnvironmentVariableName), out var location)) {
+				log.LogInfo ($"Found a valid Xcode in the environment variable '{EnvironmentVariableName}'.");
 				XcodeLocation = location;
 				return true;
 			}
@@ -93,6 +110,7 @@ namespace Xamarin.MacDev {
 					if (!TryReadSettingsPath (log, candidate, out var sdkLocation))
 						continue;
 					if (TryLocatingSpecificXcode (sdkLocation, out location)) {
+						log.LogInfo ($"Found a valid Xcode in the settings file '{candidate}'.");
 						XcodeLocation = location;
 						return true;
 					}
@@ -101,9 +119,12 @@ namespace Xamarin.MacDev {
 
 			// 3. Not optional
 			if (TryGetSystemXcode (log, out location)) {
+				log.LogInfo ($"Found a valid Xcode from the system settings ('xcode-select -p').");
 				XcodeLocation = location;
 				return true;
 			}
+
+			log.LogInfo ($"Did not find a valid Xcode.");
 
 			// 4. Nope
 			return false;
@@ -159,16 +180,20 @@ namespace Xamarin.MacDev {
 		{
 			canonicalizedXcodePath = null;
 
+#if NET
 			if (string.IsNullOrEmpty (xcodePath))
+#else
+			if (string.IsNullOrEmpty (xcodePath) || xcodePath is null)
+#endif
 				return false;
+
+			xcodePath = xcodePath.Replace ('\\', '/');
+			xcodePath = xcodePath.TrimEnd ('/');
 
 			if (!Directory.Exists (xcodePath)) {
 				log.LogInfo ("Discarded the Xcode location '{0}' because it doesn't exist.", xcodePath);
 				return false;
 			}
-
-			xcodePath = xcodePath!.Replace ('\\', '/');
-			xcodePath = xcodePath.TrimEnd ('/');
 
 			if (xcodePath.EndsWith ("/Contents/Developer", StringComparison.Ordinal))
 				xcodePath = xcodePath.Substring (0, xcodePath.Length - "/Contents/Developer".Length);
@@ -198,17 +223,17 @@ namespace Xamarin.MacDev {
 			}
 
 			var location = value?.Value;
+#if NET
 			if (string.IsNullOrEmpty (location)) {
+#else
+			if (string.IsNullOrEmpty (location) || location is null) {
+#endif
 				log.LogInfo ("The settings file {0} exists, but the 'AppleSdkRoot' is empty.", settingsPath);
 				return false;
 			}
 
 			log.LogInfo ("An Xcode location was found in the file '{0}': {1}", settingsPath, location);
-#if NET
 			sdkLocation = location;
-#else
-			sdkLocation = location!;
-#endif
 			return true;
 		}
 
@@ -217,8 +242,10 @@ namespace Xamarin.MacDev {
 			path = null;
 
 			var xcodeSelect = "/usr/bin/xcode-select";
-			if (!File.Exists (xcodeSelect))
+			if (!File.Exists (xcodeSelect)) {
+				log.LogInfo ("Could not get the system's Xcode location, because the file '{0}' doesn't exist.", xcodeSelect);
 				return false;
+			}
 
 			try {
 				using var process = new Process ();
@@ -236,11 +263,11 @@ namespace Xamarin.MacDev {
 						stdout = stdout.Substring (0, stdout.Length - "/Contents/Developer".Length);
 
 					path = stdout;
-					log.LogInfo ("Detect the Xcode location configured for this system (found using 'xcode-select -p'): {0}", path);
+					log.LogInfo ("Detect the Xcode location configured for this system (found using 'xcode-select -p'): '{0}'", path);
 					return true;
 				}
 
-				log.LogInfo ("The system's Xcode location (found using 'xcode-select -p') does not exist: {0}", stdout);
+				log.LogInfo ("The system's Xcode location (found using 'xcode-select -p') does not exist: '{0}'", stdout);
 
 				return false;
 			} catch (Exception e) {

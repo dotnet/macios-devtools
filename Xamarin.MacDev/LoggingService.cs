@@ -72,14 +72,15 @@ namespace Xamarin.MacDev {
 		}
 	}
 
+#nullable enable
+
 	public interface ICustomLogger {
-		void LogError (string message, Exception ex);
-		void LogWarning (string messageFormat, params object [] args);
-		void LogInfo (string messageFormat, params object [] args);
-		void LogDebug (string messageFormat, params object [] args);
+		void LogError (string message, Exception? ex);
+		void LogWarning (string messageFormat, params object? [] args);
+		void LogInfo (string messageFormat, params object? [] args);
+		void LogDebug (string messageFormat, params object? [] args);
 	}
 
-#nullable enable
 	// This is a logger that prints to Console.[Error.]WriteLine.
 	public class ConsoleLogger : ICustomLogger {
 		public static ConsoleLogger Instance = new ();
@@ -93,17 +94,17 @@ namespace Xamarin.MacDev {
 			}
 		}
 
-		public void LogWarning (string messageFormat, params object [] args)
+		public void LogWarning (string messageFormat, params object? [] args)
 		{
 			Console.WriteLine ("Warning: " + messageFormat, args);
 		}
 
-		public void LogInfo (string messageFormat, params object [] args)
+		public void LogInfo (string messageFormat, params object? [] args)
 		{
 			Console.WriteLine ("Info: " + messageFormat, args);
 		}
 
-		public void LogDebug (string messageFormat, params object [] args)
+		public void LogDebug (string messageFormat, params object? [] args)
 		{
 			Console.WriteLine ("Debug: " + messageFormat, args);
 		}
@@ -119,17 +120,17 @@ namespace Xamarin.MacDev {
 			LoggingService.LogError (message, ex);
 		}
 
-		public void LogWarning (string messageFormat, params object [] args)
+		public void LogWarning (string messageFormat, params object? [] args)
 		{
 			LoggingService.LogWarning (messageFormat, args);
 		}
 
-		public void LogInfo (string messageFormat, params object [] args)
+		public void LogInfo (string messageFormat, params object? [] args)
 		{
 			LoggingService.LogInfo (messageFormat, args);
 		}
 
-		public void LogDebug (string messageFormat, params object [] args)
+		public void LogDebug (string messageFormat, params object? [] args)
 		{
 			LoggingService.LogDebug (messageFormat, args);
 		}
