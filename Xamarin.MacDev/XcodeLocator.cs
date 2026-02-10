@@ -92,10 +92,18 @@ namespace Xamarin.MacDev {
 			//
 			// A few points:
 			//
-			// 1. We've recommended using MD_APPLE_SDK_ROOT in our public documentation, so we should start with making it opt-out, then eventually making it opt-in.
-			// 2. We want to deprecate the settings files, because they just confuse people. Yet we don't want to break people, so make this opt-out for now.
+			// 1. We've recommended using MD_APPLE_SDK_ROOT in our public documentation, so make it possible to opt-in for now.
+			// 2. We want to deprecate the settings files, because they just confuse people. Yet we don't want to break people, so make it possible to opt-in for now.
 			// 3. This is good.
 			// 4. Why check something that probably doesn't even exist (if xcode-select --print-path doesn't know about it, it probably doesn't work).
+			//
+			// So the current behavior is:
+			//
+			// 0. Use the override (dotnet/macios sets the override if the "XcodeLocation" MSBuild property is set)
+			// 1. Check the MD_APPLE_SDK_ROOT variable, if this is enabled (it's off by default here; dotnet/macios enables it for .NET 10 projects and disables it for .NET 11+ projects)
+			// 2. Check the settings files, if this is enabled (it's off by default here; dotnet/macios enables it for .NET 10 projects and disables it for .NET 11+ projects)
+			// 3. Check `xcode-select --print-path`
+			// 4. Give up.
 
 			// 1. This is opt-out
 			if (SupportEnvironmentVariableLookup && TryLocatingSpecificXcode (Environment.GetEnvironmentVariable (EnvironmentVariableName), out var location)) {
