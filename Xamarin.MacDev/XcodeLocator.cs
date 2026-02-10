@@ -105,7 +105,7 @@ namespace Xamarin.MacDev {
 			// 3. Check `xcode-select --print-path`
 			// 4. Give up.
 
-			// 1. This is opt-out
+			// 1. This is opt-in
 			if (SupportEnvironmentVariableLookup && TryLocatingSpecificXcode (Environment.GetEnvironmentVariable (EnvironmentVariableName), out var location)) {
 				log.LogInfo ($"Found a valid Xcode in the environment variable '{EnvironmentVariableName}'.");
 				XcodeLocation = location;
