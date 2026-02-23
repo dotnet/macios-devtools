@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <RepositoryUrl>https://github.com/dotnet/macios-devtools</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <DotNetTargetFramework>net10.0</DotNetTargetFramework>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)bin\</BaseOutputPath>
+    <ToolOutputFullPath>$(BaseOutputPath)$(Configuration)\</ToolOutputFullPath>
+    <TestOutputFullPath>$(BaseOutputPath)Test$(Configuration)\</TestOutputFullPath>
+  </PropertyGroup>
+</Project>
