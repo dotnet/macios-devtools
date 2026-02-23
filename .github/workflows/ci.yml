@@ -28,11 +28,28 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Build
-      run: dotnet build Xamarin.MacDev.sln -c Release -bl:${{ github.workspace }}/artifacts/build.binlog
+    - name: Prepare artifacts directories
+      shell: bash
+      run: |
+        mkdir -p "${{ github.workspace }}/artifacts"
+        mkdir -p "${{ github.workspace }}/artifacts/test-results"
+        mkdir -p "${{ github.workspace }}/artifacts/packages"
 
-    - name: Test
-      run: dotnet test Xamarin.MacDev.sln -c Release --no-build -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
+    - name: Build (Windows)
+      if: runner.os == 'Windows'
+      run: dotnet build Xamarin.MacDev/Xamarin.MacDev.csproj -c Release -bl:${{ github.workspace }}/artifacts/build.binlog
+
+    - name: Build (macOS)
+      if: runner.os == 'macOS'
+      run: dotnet build Xamarin.MacDev/Xamarin.MacDev.csproj -c Release -bl:${{ github.workspace }}/artifacts/build.binlog
+
+    - name: Test (Windows)
+      if: runner.os == 'Windows'
+      run: dotnet test UnitTests/UnitTests.csproj -c Release -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
+
+    - name: Test (macOS)
+      if: runner.os == 'macOS'
+      run: dotnet test UnitTests/UnitTests.csproj -c Release -f net10.0 -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
 
     - name: Calculate Version (Windows)
       if: runner.os == 'Windows'
@@ -56,6 +73,7 @@ jobs:
         echo "PACKAGE_VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Pack NuGet
+      if: runner.os == 'Windows'
       run: dotnet pack Xamarin.MacDev/Xamarin.MacDev.csproj -c Release --no-build -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/artifacts/packages
 
     - name: Upload Build Artifacts
@@ -66,6 +84,7 @@ jobs:
 
     - name: Upload NuGet Package
       uses: actions/upload-artifact@v4
+      if: runner.os == 'Windows'
       with:
         name: nuget-package-${{ matrix.os }}
         path: ${{ github.workspace }}/artifacts/packages/*.nupkg
