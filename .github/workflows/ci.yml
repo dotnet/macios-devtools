@@ -34,6 +34,12 @@ jobs:
         mkdir -p "${{ github.workspace }}/artifacts"
         mkdir -p "${{ github.workspace }}/artifacts/test-results"
         mkdir -p "${{ github.workspace }}/artifacts/packages"
+    - name: Prepare artifacts directories
+      shell: bash
+      run: |
+        mkdir -p "${{ github.workspace }}/artifacts"
+        mkdir -p "${{ github.workspace }}/artifacts/test-results"
+        mkdir -p "${{ github.workspace }}/artifacts/packages"
 
     - name: Build (Windows)
       if: runner.os == 'Windows'
