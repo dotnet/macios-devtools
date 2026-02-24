@@ -57,19 +57,8 @@ jobs:
       if: runner.os == 'macOS'
       run: dotnet test UnitTests/UnitTests.csproj -c Release -f net10.0 -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
 
-    - name: Calculate Version (Windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        $hashOfLastVersionChange = git log --follow -1 --pretty=%H nuget.version
-        $commitsSinceVersionChange = git rev-list --count "$hashOfLastVersionChange..HEAD"
-        $majorMinor = Get-Content nuget.version
-        $version = "$majorMinor.$commitsSinceVersionChange"
-        Write-Host "Package version: $version"
-        echo "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
-
-    - name: Calculate Version (macOS/Linux)
-      if: runner.os != 'Windows'
+    - name: Calculate Version
+      shell: bash
       run: |
         HASH_OF_LAST_VERSION_CHANGE=$(git log --follow -1 --pretty=%H nuget.version)
         COMMITS_SINCE_VERSION_CHANGE=$(git rev-list --count "$HASH_OF_LAST_VERSION_CHANGE..HEAD")
