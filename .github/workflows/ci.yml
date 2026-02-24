@@ -34,13 +34,6 @@ jobs:
         mkdir -p "${{ github.workspace }}/artifacts"
         mkdir -p "${{ github.workspace }}/artifacts/test-results"
         mkdir -p "${{ github.workspace }}/artifacts/packages"
-    - name: Prepare artifacts directories
-      shell: bash
-      run: |
-        mkdir -p "${{ github.workspace }}/artifacts"
-        mkdir -p "${{ github.workspace }}/artifacts/test-results"
-        mkdir -p "${{ github.workspace }}/artifacts/packages"
-
     - name: Build (Windows)
       if: runner.os == 'Windows'
       run: dotnet build Xamarin.MacDev/Xamarin.MacDev.csproj -c Release -bl:${{ github.workspace }}/artifacts/build.binlog
