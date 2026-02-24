@@ -15,9 +15,9 @@
     <Authors>Microsoft</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/dotnet/macios-devtools</PackageProjectUrl>
-    <Description>Xamarin tools for interacting with Apple SDKs.</Description>
+    <Description>Tools for interacting with Apple SDKs.</Description>
     <Copyright>Copyright © Microsoft</Copyright>
-    <PackageTags>Xamarin;macOS;iOS;Apple</PackageTags>
+    <PackageTags>macOS;iOS;Apple</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

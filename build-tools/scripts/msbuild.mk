@@ -2,7 +2,7 @@
 # MSBuild Abstraction.
 #
 # Makefile targets which need to invoke MSBuild should use `$(MSBUILD)`,
-# not some specific MSBuild program such as `xbuild` or `msbuild`.
+# not some specific MSBuild program such as `dotnet build` or `msbuild`.
 #
 # Typical use will also include `$(MSBUILD_FLAGS)`, which provides the
 # Configuration and logging verbosity, as per $(CONFIGURATION) and $(V):
