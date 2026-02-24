@@ -1,0 +1,91 @@
+name: macios-devtools $(Rev:r)
+
+trigger:
+- main
+- release/*
+
+pr:
+- main
+- release/*
+
+variables:
+  - name: DotNetCoreVersion
+    value: 10.0.x
+
+jobs:
+- job: build
+  displayName: Build and Test
+  timeoutInMinutes: 60
+  strategy:
+    matrix:
+      macOS:
+        vmImage: macOS-15
+      windows:
+        vmImage: windows-2022
+  pool:
+    vmImage: $(vmImage)
+  workspace:
+    clean: all
+  steps:
+  - checkout: self
+    clean: true
+    fetchDepth: 0
+
+  - task: UseDotNet@2
+    displayName: Use .NET Core $(DotNetCoreVersion)
+    inputs:
+      version: $(DotNetCoreVersion)
+
+  - task: DotNetCoreCLI@2
+    displayName: Build Xamarin.MacDev
+    inputs:
+      command: build
+      projects: Xamarin.MacDev/Xamarin.MacDev.csproj
+      arguments: -c Release -bl:$(Build.ArtifactStagingDirectory)/build.binlog
+
+  - task: DotNetCoreCLI@2
+    displayName: Run Tests (Windows)
+    inputs:
+      command: test
+      projects: UnitTests/UnitTests.csproj
+      arguments: -c Release --logger "console;verbosity=detailed" --logger trx --results-directory $(Build.ArtifactStagingDirectory)/test-results
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
+
+  - task: DotNetCoreCLI@2
+    displayName: Run Tests (macOS)
+    inputs:
+      command: test
+      projects: UnitTests/UnitTests.csproj
+      arguments: -c Release -f net10.0 --logger "console;verbosity=detailed" --logger trx --results-directory $(Build.ArtifactStagingDirectory)/test-results
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))
+
+  - powershell: |
+      $hashOfLastVersionChange = & "git" "log" "--follow" "-1" "--pretty=%H" "nuget.version"
+      $commitsSinceVersionChange = & "git" "rev-list" "--count" "$hashOfLastVersionChange..HEAD"
+      $majorMinor = Get-Content "nuget.version"
+      $version = "$majorMinor.$commitsSinceVersionChange"
+      Write-Host "##vso[task.setvariable variable=xmd.nuget.version]$version"
+    displayName: Calculate Version (Windows)
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
+
+  - task: DotNetCoreCLI@2
+    displayName: Build NuGet (Windows)
+    inputs:
+      command: custom
+      projects: Xamarin.MacDev/Xamarin.MacDev.csproj
+      custom: pack
+      arguments: -c Release --no-build -p:PackageVersion=$(xmd.nuget.version) -p:PackageOutputPath=$(Build.ArtifactStagingDirectory)/packages -bl:$(Build.ArtifactStagingDirectory)/pack.binlog
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
+
+  - task: PublishPipelineArtifact@1
+    displayName: Upload Build Output
+    inputs:
+      path: bin/Release
+      artifactName: Output - $(System.JobName)
+
+  - task: PublishPipelineArtifact@1
+    displayName: Upload Artifacts
+    inputs:
+      path: $(Build.ArtifactStagingDirectory)
+      artifactName: Artifacts - $(System.JobName)
+    condition: always()
