@@ -1,7 +1,7 @@
 CONFIGURATION   := Debug
 V               ?= 0
 
-include build-tools/scripts/msbuild.mk
+include eng/scripts/msbuild.mk
 
 all:
 	$(MSBUILD) $(MSBUILD_FLAGS) Xamarin.MacDev.sln
