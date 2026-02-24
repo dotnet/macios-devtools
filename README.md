@@ -6,7 +6,7 @@ This module is a support repository used by both **Xamarin.iOS** and **Xamarin.M
 
 It contains support libraries used during msbuild builds.
 
-See [xamarin-macios](https://github.com/xamarin/xamarin-macios/blob/master/README.md#contributing) for more information on contributing to and providing feedback on Xamarin.iOS and Xamarin.Mac.
+See [dotnet/macios](https://github.com/dotnet/macios) for more information on contributing to and providing feedback on Xamarin.iOS and Xamarin.Mac.
 
 ## License
 
