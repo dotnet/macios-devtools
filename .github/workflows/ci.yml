@@ -1,0 +1,87 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, release/* ]
+  pull_request:
+    branches: [ main, release/* ]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build:
+    name: Build and Test
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for version calculation
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Prepare artifacts directories
+      shell: bash
+      run: |
+        mkdir -p "${{ github.workspace }}/artifacts"
+        mkdir -p "${{ github.workspace }}/artifacts/test-results"
+        mkdir -p "${{ github.workspace }}/artifacts/packages"
+    - name: Build (Windows)
+      if: runner.os == 'Windows'
+      run: dotnet build Xamarin.MacDev/Xamarin.MacDev.csproj -c Release -bl:${{ github.workspace }}/artifacts/build.binlog
+
+    - name: Build (macOS)
+      if: runner.os == 'macOS'
+      run: dotnet build Xamarin.MacDev/Xamarin.MacDev.csproj -c Release -bl:${{ github.workspace }}/artifacts/build.binlog
+
+    - name: Test (Windows)
+      if: runner.os == 'Windows'
+      run: dotnet test UnitTests/UnitTests.csproj -c Release -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
+
+    - name: Test (macOS)
+      if: runner.os == 'macOS'
+      run: dotnet test UnitTests/UnitTests.csproj -c Release -f net10.0 -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
+
+    - name: Calculate Version
+      shell: bash
+      run: |
+        HASH_OF_LAST_VERSION_CHANGE=$(git log --follow -1 --pretty=%H nuget.version)
+        COMMITS_SINCE_VERSION_CHANGE=$(git rev-list --count "$HASH_OF_LAST_VERSION_CHANGE..HEAD")
+        MAJOR_MINOR=$(cat nuget.version)
+        VERSION="$MAJOR_MINOR.$COMMITS_SINCE_VERSION_CHANGE"
+        echo "Package version: $VERSION"
+        echo "PACKAGE_VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Pack NuGet
+      if: runner.os == 'Windows'
+      run: dotnet pack Xamarin.MacDev/Xamarin.MacDev.csproj -c Release --no-build -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/artifacts/packages
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-output-${{ matrix.os }}
+        path: bin/Release/
+
+    - name: Upload NuGet Package
+      uses: actions/upload-artifact@v4
+      if: runner.os == 'Windows'
+      with:
+        name: nuget-package-${{ matrix.os }}
+        path: ${{ github.workspace }}/artifacts/packages/*.nupkg
+
+    - name: Upload Logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: logs-${{ matrix.os }}
+        path: |
+          ${{ github.workspace }}/artifacts/*.binlog
+          ${{ github.workspace }}/artifacts/test-results/

@@ -52,8 +52,19 @@ namespace UnitTests {
 
 			var dir = Path.GetDirectoryName (codeBase);
 
-			while (Path.GetFileName (dir) != "UnitTests")
-				dir = Path.GetFullPath (Path.Combine (dir, ".."));
+			while (!string.Equals (Path.GetFileName (dir), "UnitTests", StringComparison.Ordinal)) {
+				var candidate = Path.Combine (dir, "UnitTests");
+				if (Directory.Exists (candidate)) {
+					dir = candidate;
+					break;
+				}
+
+				var parent = Path.GetDirectoryName (dir);
+				if (string.IsNullOrEmpty (parent))
+					throw new DirectoryNotFoundException ($"Unable to locate UnitTests directory from '{codeBase}'.");
+
+				dir = parent;
+			}
 
 			ProjectDir = Path.GetFullPath (dir);
 		}

@@ -8,15 +8,50 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <!-- NuGet Package Properties -->
+  <PropertyGroup>
+    <Title>Xamarin.MacDev</Title>
+    <Authors>Microsoft</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/dotnet/macios-devtools</PackageProjectUrl>
+    <Description>Tools for interacting with Apple SDKs.</Description>
+    <Copyright>Copyright © Microsoft</Copyright>
+    <PackageTags>macOS;iOS;Apple</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!-- Output Path -->
+  <PropertyGroup>
+    <OutputPath>$(ToolOutputFullPath)</OutputPath>
+  </PropertyGroup>
+
+  <!-- Trimming/AOT for non-netstandard targets -->
+  <PropertyGroup Condition=" '$(TargetFramework)' != 'netstandard2.0' ">
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' != 'netstandard2.0' ">
+    <Compile Remove="NullableAttributes.cs" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MicroBuild.Core" Version="0.3.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
-  <ItemGroup>
-    <FilesToSign Include="$(OutDir)\$(AssemblyName).dll">
-      <Authenticode>Microsoft400</Authenticode>
-    </FilesToSign>
-  </ItemGroup>
+
+  <Target Name="GetFilesToSign" BeforeTargets="SignFiles" Condition=" '$(Configuration)' == 'Release' ">
+    <ItemGroup>
+      <FilesToSign Include="$(OutDir)\$(AssemblyName).dll">
+        <Authenticode>Microsoft400</Authenticode>
+      </FilesToSign>
+    </ItemGroup>
+  </Target>
 </Project>
