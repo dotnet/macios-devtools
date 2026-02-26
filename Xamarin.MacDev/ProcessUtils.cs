@@ -28,6 +28,12 @@ namespace Xamarin.MacDev {
 			psi.RedirectStandardOutput |= stdout is not null;
 			psi.RedirectStandardError |= stderr is not null;
 
+			// Provide sinks when redirection is on but no writer was supplied
+			if (psi.RedirectStandardOutput && stdout is null)
+				stdout = TextWriter.Null;
+			if (psi.RedirectStandardError && stderr is null)
+				stderr = TextWriter.Null;
+
 			var process = new Process {
 				StartInfo = psi,
 				EnableRaisingEvents = true,
@@ -119,26 +125,20 @@ namespace Xamarin.MacDev {
 		/// <summary>
 		/// Synchronous convenience wrapper around <see cref="StartProcess"/>.
 		/// Runs an executable and returns stdout/stderr and the exit code.
+		/// Uses Task.WhenAll to avoid potential deadlock when process buffer fills up.
 		/// </summary>
 		public static (int exitCode, string stdout, string stderr) Exec (string executable, string arguments)
 		{
 			var psi = new ProcessStartInfo (executable, arguments) {
-				UseShellExecute = false,
-				RedirectStandardOutput = true,
-				RedirectStandardError = true,
 				CreateNoWindow = true,
 			};
 
-			using (var process = new Process { StartInfo = psi }) {
-				process.Start ();
-				var stdoutTask = process.StandardOutput.ReadToEndAsync ();
-				var stderrTask = process.StandardError.ReadToEndAsync ();
-				process.WaitForExit ();
-				var stdout = stdoutTask.GetAwaiter ().GetResult ();
-				var stderr = stderrTask.GetAwaiter ().GetResult ();
+			using var stdout = new StringWriter ();
+			using var stderr = new StringWriter ();
 
-				return (process.ExitCode, stdout, stderr);
-			}
+			var exitCode = StartProcess (psi, stdout, stderr).GetAwaiter ().GetResult ();
+
+			return (exitCode, stdout.ToString (), stderr.ToString ());
 		}
 
 		static void KillProcess (Process p)
@@ -147,6 +147,8 @@ namespace Xamarin.MacDev {
 				p.Kill ();
 			} catch (InvalidOperationException) {
 				// Process may have already exited
+			} catch (System.ComponentModel.Win32Exception) {
+				// Process cannot be terminated (e.g. access denied)
 			}
 		}
 
