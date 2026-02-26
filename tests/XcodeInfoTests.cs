@@ -7,7 +7,7 @@ using NUnit.Framework;
 
 using Xamarin.MacDev.Models;
 
-namespace UnitTests {
+namespace Tests {
 
 	[TestFixture]
 	public class XcodeInfoTests {

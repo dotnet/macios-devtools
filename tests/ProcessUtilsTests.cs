@@ -11,7 +11,7 @@ using NUnit.Framework;
 
 using Xamarin.MacDev;
 
-namespace UnitTests {
+namespace Tests {
 
 	[TestFixture]
 	public class ProcessUtilsTests {

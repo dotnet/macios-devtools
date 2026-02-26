@@ -31,7 +31,7 @@ using System.Text;
 using NUnit.Framework;
 using Xamarin.MacDev;
 
-namespace UnitTests {
+namespace Tests {
 	[TestFixture]
 	public class PListObjectTests {
 		static readonly KeyValuePair<string, long> [] IntegerKeyValuePairs = new KeyValuePair<string, long> [] {
@@ -61,7 +61,7 @@ namespace UnitTests {
 		{
 			PDictionary plist;
 
-			using (var stream = GetType ().Assembly.GetManifestResourceStream ($"UnitTests.TestData.PropertyLists.{fileName}"))
+			using (var stream = GetType ().Assembly.GetManifestResourceStream ($"tests.TestData.PropertyLists.{fileName}"))
 				plist = (PDictionary) PObject.FromStream (stream);
 
 			Assert.That (plist.Count, Is.EqualTo (IntegerKeyValuePairs.Length));
@@ -85,7 +85,7 @@ namespace UnitTests {
 			var output = plist.ToXml ();
 			string expected;
 
-			using (var stream = GetType ().Assembly.GetManifestResourceStream ("UnitTests.TestData.PropertyLists.xml-integers.plist")) {
+			using (var stream = GetType ().Assembly.GetManifestResourceStream ("tests.TestData.PropertyLists.xml-integers.plist")) {
 				var buffer = new byte [stream.Length];
 #if NET7_0_OR_GREATER
 				stream.ReadExactly (buffer, 0, buffer.Length);
@@ -129,7 +129,7 @@ namespace UnitTests {
 		{
 			PDictionary plist;
 
-			using (var stream = GetType ().Assembly.GetManifestResourceStream ($"UnitTests.TestData.PropertyLists.strings.plist"))
+			using (var stream = GetType ().Assembly.GetManifestResourceStream ($"tests.TestData.PropertyLists.strings.plist"))
 				plist = (PDictionary) PObject.FromStream (stream);
 
 			Assert.That (plist.Count, Is.EqualTo (2));

@@ -14,7 +14,7 @@ secure, readable, and maintainable code that follows .NET conventions and existi
 - **C# Version**: `latest` (per project files)
 - **Nullable**: Enabled
 - **Purpose**: Apple SDK discovery, provisioning profiles, plist parsing, Xcode integration
-- **Tests**: NUnit (UnitTests project)
+- **Tests**: NUnit (tests project)
 
 When invoked:
 
@@ -49,7 +49,7 @@ When invoked:
 ## Build and Test
 
 - Build: `dotnet build Xamarin.MacDev.sln`
-- Tests: `dotnet test UnitTests/UnitTests.csproj`
+- Tests: `dotnet test tests/tests.csproj`
 - Pack: `dotnet pack Xamarin.MacDev/Xamarin.MacDev.csproj`
 
 ## Async Best Practices

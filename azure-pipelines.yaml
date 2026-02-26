@@ -47,7 +47,7 @@ jobs:
     displayName: Run Tests (Windows)
     inputs:
       command: test
-      projects: UnitTests/UnitTests.csproj
+      projects: tests/tests.csproj
       publishTestResults: false
       arguments: -c Release --logger "console;verbosity=detailed" --logger trx --results-directory $(Build.ArtifactStagingDirectory)/test-results
     condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
@@ -64,7 +64,7 @@ jobs:
     displayName: Run Tests (macOS)
     inputs:
       command: test
-      projects: UnitTests/UnitTests.csproj
+      projects: tests/tests.csproj
       publishTestResults: false
       arguments: -c Release -f net10.0 --logger "console;verbosity=detailed" --logger trx --results-directory $(Build.ArtifactStagingDirectory)/test-results
     condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))

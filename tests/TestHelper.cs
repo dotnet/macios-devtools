@@ -28,7 +28,7 @@ using System.IO;
 
 using NUnit.Framework;
 
-namespace UnitTests {
+namespace Tests {
 	[SetUpFixture]
 	static class TestHelper {
 		public static readonly string ProjectDir;
@@ -52,8 +52,8 @@ namespace UnitTests {
 
 			var dir = Path.GetDirectoryName (codeBase);
 
-			while (!string.Equals (Path.GetFileName (dir), "UnitTests", StringComparison.Ordinal)) {
-				var candidate = Path.Combine (dir, "UnitTests");
+			while (!string.Equals (Path.GetFileName (dir), "tests", StringComparison.Ordinal)) {
+				var candidate = Path.Combine (dir, "tests");
 				if (Directory.Exists (candidate)) {
 					dir = candidate;
 					break;
@@ -61,7 +61,7 @@ namespace UnitTests {
 
 				var parent = Path.GetDirectoryName (dir);
 				if (string.IsNullOrEmpty (parent))
-					throw new DirectoryNotFoundException ($"Unable to locate UnitTests directory from '{codeBase}'.");
+					throw new DirectoryNotFoundException ($"Unable to locate tests directory from '{codeBase}'.");
 
 				dir = parent;
 			}

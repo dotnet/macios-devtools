@@ -14,7 +14,7 @@ provisioning, plist parsing, and related developer utilities.
 - C# Language Version: `latest` (per project files)
 - Nullable reference types are enabled
 - SDK-style projects built with `dotnet build` (or `make`)
-- Tests: `UnitTests` project using **NUnit**
+- Tests: `tests` project using **NUnit**
 
 ## Guidance
 
