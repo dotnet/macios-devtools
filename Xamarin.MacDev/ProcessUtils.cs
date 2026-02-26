@@ -35,10 +35,15 @@ namespace Xamarin.MacDev {
 
 			Task output = Task.FromResult (true);
 			Task error = Task.FromResult (true);
-			Task exit = WaitForExitAsync (process);
+			var exitDone = new TaskCompletionSource<bool> ();
+			process.Exited += (o, e) => exitDone.TrySetResult (true);
 
 			using (process) {
 				process.Start ();
+
+				// Guard against race where process exits before Exited handler fires
+				if (process.HasExited)
+					exitDone.TrySetResult (true);
 
 				using (cancellationToken.Register (() => KillProcess (process))) {
 					if (psi.RedirectStandardOutput)
@@ -47,7 +52,7 @@ namespace Xamarin.MacDev {
 					if (psi.RedirectStandardError)
 						error = ReadStreamAsync (process.StandardError, TextWriter.Synchronized (stderr!));
 
-					await Task.WhenAll (output, error, exit).ConfigureAwait (false);
+					await Task.WhenAll (output, error, exitDone.Task).ConfigureAwait (false);
 				}
 
 				cancellationToken.ThrowIfCancellationRequested ();
@@ -104,7 +109,9 @@ namespace Xamarin.MacDev {
 				return stdout.ToString ().Trim ();
 			} catch (OperationCanceledException) {
 				throw;
-			} catch {
+			} catch (System.ComponentModel.Win32Exception) {
+				return null;
+			} catch (InvalidOperationException) {
 				return null;
 			}
 		}
@@ -122,13 +129,16 @@ namespace Xamarin.MacDev {
 				CreateNoWindow = true,
 			};
 
-			using var process = new Process { StartInfo = psi };
-			process.Start ();
-			var stdout = process.StandardOutput.ReadToEnd ();
-			var stderr = process.StandardError.ReadToEnd ();
-			process.WaitForExit ();
+			using (var process = new Process { StartInfo = psi }) {
+				process.Start ();
+				var stdoutTask = process.StandardOutput.ReadToEndAsync ();
+				var stderrTask = process.StandardError.ReadToEndAsync ();
+				process.WaitForExit ();
+				var stdout = stdoutTask.GetAwaiter ().GetResult ();
+				var stderr = stderrTask.GetAwaiter ().GetResult ();
 
-			return (process.ExitCode, stdout, stderr);
+				return (process.ExitCode, stdout, stderr);
+			}
 		}
 
 		static void KillProcess (Process p)
@@ -138,13 +148,6 @@ namespace Xamarin.MacDev {
 			} catch (InvalidOperationException) {
 				// Process may have already exited
 			}
-		}
-
-		static Task WaitForExitAsync (Process process)
-		{
-			var exitDone = new TaskCompletionSource<bool> ();
-			process.Exited += (o, e) => exitDone.TrySetResult (true);
-			return exitDone.Task;
 		}
 
 		static async Task ReadStreamAsync (StreamReader stream, TextWriter destination)
