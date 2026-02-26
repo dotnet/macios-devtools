@@ -70,11 +70,11 @@ namespace UnitTests {
 		public void StartProcess_RespectsCanellation ()
 		{
 			using (var cts = new CancellationTokenSource ()) {
-			cts.Cancel ();
+				cts.Cancel ();
 
-			Assert.ThrowsAsync<OperationCanceledException> (async () => {
-				await ProcessUtils.RunAsync ("/bin/sleep", "60", cts.Token);
-			});
+				Assert.ThrowsAsync<OperationCanceledException> (async () => {
+					await ProcessUtils.RunAsync ("/bin/sleep", "60", cts.Token);
+				});
 			}
 		}
 
