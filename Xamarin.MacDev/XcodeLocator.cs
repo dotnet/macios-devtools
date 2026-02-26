@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -256,14 +255,11 @@ namespace Xamarin.MacDev {
 			}
 
 			try {
-				using var process = new Process ();
-				process.StartInfo.FileName = xcodeSelect;
-				process.StartInfo.Arguments = "--print-path";
-				process.StartInfo.RedirectStandardOutput = true;
-				process.StartInfo.UseShellExecute = false;
-				process.Start ();
-				var stdout = process.StandardOutput.ReadToEnd ();
-				process.WaitForExit ();
+				var (exitCode, stdout, _) = ProcessUtils.Exec (xcodeSelect, "--print-path");
+				if (exitCode != 0) {
+					log.LogInfo ("'xcode-select -p' returned exit code {0}.", exitCode);
+					return false;
+				}
 
 				stdout = stdout.Trim ();
 				if (Directory.Exists (stdout)) {
