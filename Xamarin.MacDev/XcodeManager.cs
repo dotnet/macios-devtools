@@ -76,6 +76,24 @@ namespace Xamarin.MacDev {
 		}
 
 		/// <summary>
+		/// Returns the best available Xcode: the currently selected one, or
+		/// the highest-versioned installation if none is selected.
+		/// </summary>
+		public XcodeInfo? GetBest ()
+		{
+			var all = List ();
+			if (all.Count == 0)
+				return null;
+
+			var selected = all.Find (x => x.IsSelected);
+			if (selected is not null)
+				return selected;
+
+			all.Sort ((a, b) => b.Version.CompareTo (a.Version));
+			return all [0];
+		}
+
+		/// <summary>
 		/// Selects the active Xcode by calling <c>xcode-select -s</c>.
 		/// Returns true if the command succeeded.
 		/// Note: this typically requires root privileges (sudo).
