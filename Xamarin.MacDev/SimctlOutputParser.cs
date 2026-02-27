@@ -36,26 +36,30 @@ namespace Xamarin.MacDev {
 			if (string.IsNullOrEmpty (json))
 				return devices;
 
-			using (var doc = JsonDocument.Parse (json, JsonOptions)) {
-				if (!doc.RootElement.TryGetProperty ("devices", out var devicesElement))
-					return devices;
+			try {
+				using (var doc = JsonDocument.Parse (json, JsonOptions)) {
+					if (!doc.RootElement.TryGetProperty ("devices", out var devicesElement))
+						return devices;
 
-				foreach (var runtimeProp in devicesElement.EnumerateObject ()) {
-					var runtimeId = runtimeProp.Name;
+					foreach (var runtimeProp in devicesElement.EnumerateObject ()) {
+						var runtimeId = runtimeProp.Name;
 
-					foreach (var device in runtimeProp.Value.EnumerateArray ()) {
-						var info = new SimulatorDeviceInfo {
-							RuntimeIdentifier = runtimeId,
-							Name = GetString (device, "name"),
-							Udid = GetString (device, "udid"),
-							State = GetString (device, "state"),
-							DeviceTypeIdentifier = GetString (device, "deviceTypeIdentifier"),
-							IsAvailable = GetBool (device, "isAvailable"),
-						};
+						foreach (var device in runtimeProp.Value.EnumerateArray ()) {
+							var info = new SimulatorDeviceInfo {
+								RuntimeIdentifier = runtimeId,
+								Name = GetString (device, "name"),
+								Udid = GetString (device, "udid"),
+								State = GetString (device, "state"),
+								DeviceTypeIdentifier = GetString (device, "deviceTypeIdentifier"),
+								IsAvailable = GetBool (device, "isAvailable"),
+							};
 
-						devices.Add (info);
+							devices.Add (info);
+						}
 					}
 				}
+			} catch (JsonException) {
+				// Malformed simctl output — return whatever we parsed so far
 			}
 
 			return devices;
@@ -71,23 +75,27 @@ namespace Xamarin.MacDev {
 			if (string.IsNullOrEmpty (json))
 				return runtimes;
 
-			using (var doc = JsonDocument.Parse (json, JsonOptions)) {
-				if (!doc.RootElement.TryGetProperty ("runtimes", out var runtimesArray))
-					return runtimes;
+			try {
+				using (var doc = JsonDocument.Parse (json, JsonOptions)) {
+					if (!doc.RootElement.TryGetProperty ("runtimes", out var runtimesArray))
+						return runtimes;
 
-				foreach (var rt in runtimesArray.EnumerateArray ()) {
-					var info = new SimulatorRuntimeInfo {
-						Name = GetString (rt, "name"),
-						Identifier = GetString (rt, "identifier"),
-						Version = GetString (rt, "version"),
-						BuildVersion = GetString (rt, "buildversion"),
-						Platform = GetString (rt, "platform"),
-						IsAvailable = GetBool (rt, "isAvailable"),
-						IsBundled = GetBool (rt, "isInternal"),
-					};
+					foreach (var rt in runtimesArray.EnumerateArray ()) {
+						var info = new SimulatorRuntimeInfo {
+							Name = GetString (rt, "name"),
+							Identifier = GetString (rt, "identifier"),
+							Version = GetString (rt, "version"),
+							BuildVersion = GetString (rt, "buildversion"),
+							Platform = GetString (rt, "platform"),
+							IsAvailable = GetBool (rt, "isAvailable"),
+							IsBundled = GetBool (rt, "isInternal"),
+						};
 
-					runtimes.Add (info);
+						runtimes.Add (info);
+					}
 				}
+			} catch (JsonException) {
+				// Malformed simctl output — return whatever we parsed so far
 			}
 
 			return runtimes;
