@@ -22,7 +22,7 @@ namespace Tests {
 		static string [] EchoArgs (string text)
 		{
 			return IsWindows
-				? new [] { "/c", "echo", text }
+				? new [] { "/c", $"echo {text}" }
 				: new [] { "-c", $"echo {text}" };
 		}
 
