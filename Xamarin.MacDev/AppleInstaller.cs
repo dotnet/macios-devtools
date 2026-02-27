@@ -85,10 +85,11 @@ namespace Xamarin.MacDev {
 				return;
 			}
 
+			const string xcodeSelectPath = "/usr/bin/xcode-select";
+
 			log.LogInfo ("Command Line Tools not found. Triggering installation...");
 			try {
-				// xcode-select --install triggers the macOS installer dialog
-				var (exitCode, _, stderr) = ProcessUtils.Exec ("xcode-select", "--install");
+				var (exitCode, _, stderr) = ProcessUtils.Exec (xcodeSelectPath, "--install");
 				if (exitCode == 0)
 					log.LogInfo ("Command Line Tools installer triggered. Complete the dialog to continue.");
 				else
