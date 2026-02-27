@@ -44,11 +44,11 @@ jobs:
 
     - name: Test (Windows)
       if: runner.os == 'Windows'
-      run: dotnet test UnitTests/UnitTests.csproj -c Release -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
+      run: dotnet test tests/tests.csproj -c Release -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
 
     - name: Test (macOS)
       if: runner.os == 'macOS'
-      run: dotnet test UnitTests/UnitTests.csproj -c Release -f net10.0 -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
+      run: dotnet test tests/tests.csproj -c Release -f net10.0 -l "console;verbosity=detailed" -l trx --results-directory ${{ github.workspace }}/artifacts/test-results
 
     - name: Calculate Version
       shell: bash
