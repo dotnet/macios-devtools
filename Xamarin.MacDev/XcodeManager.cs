@@ -95,6 +95,7 @@ namespace Xamarin.MacDev {
 
 		/// <summary>
 		/// Selects the active Xcode by calling <c>xcode-select -s</c>.
+		/// Accepts either an Xcode.app bundle path or its Developer directory.
 		/// Returns true if the command succeeded.
 		/// Note: this typically requires root privileges (sudo).
 		/// </summary>
@@ -108,13 +109,22 @@ namespace Xamarin.MacDev {
 				return false;
 			}
 
+			// xcode-select -s expects the Developer directory, not the .app bundle
+			var developerDir = path;
+			if (!path.EndsWith ("/Contents/Developer", StringComparison.Ordinal)
+				&& !path.EndsWith ("\\Contents\\Developer", StringComparison.Ordinal)) {
+				var candidate = Path.Combine (path, "Contents", "Developer");
+				if (Directory.Exists (candidate))
+					developerDir = candidate;
+			}
+
 			if (!File.Exists (XcodeSelectPath)) {
 				log.LogInfo ("Cannot select Xcode: xcode-select not found.");
 				return false;
 			}
 
 			try {
-				var (exitCode, _, stderr) = ProcessUtils.Exec (XcodeSelectPath, "-s", path);
+				var (exitCode, _, stderr) = ProcessUtils.Exec (XcodeSelectPath, "-s", developerDir);
 				if (exitCode != 0) {
 					log.LogInfo ("xcode-select -s returned exit code {0}: {1}", exitCode, stderr.Trim ());
 					return false;
@@ -155,7 +165,7 @@ namespace Xamarin.MacDev {
 		/// </summary>
 		List<string> FindXcodeApps ()
 		{
-			var paths = new List<string> ();
+			var pathSet = new HashSet<string> (StringComparer.Ordinal);
 
 			// 1. Try Spotlight (mdfind) — fastest way to find all Xcode bundles
 			if (File.Exists (MdfindPath)) {
@@ -165,7 +175,7 @@ namespace Xamarin.MacDev {
 						foreach (var rawLine in stdout.Split ('\n')) {
 							var line = rawLine.Trim ();
 							if (line.Length > 0 && Directory.Exists (line))
-								paths.Add (line);
+								pathSet.Add (line);
 						}
 					}
 				} catch (System.ComponentModel.Win32Exception ex) {
@@ -177,15 +187,14 @@ namespace Xamarin.MacDev {
 			if (Directory.Exists (ApplicationsDir)) {
 				try {
 					foreach (var dir in Directory.GetDirectories (ApplicationsDir, "Xcode*.app")) {
-						if (!paths.Contains (dir))
-							paths.Add (dir);
+						pathSet.Add (dir);
 					}
 				} catch (UnauthorizedAccessException ex) {
 					log.LogInfo ("Could not scan /Applications: {0}", ex.Message);
 				}
 			}
 
-			return paths;
+			return new List<string> (pathSet);
 		}
 
 		/// <summary>
