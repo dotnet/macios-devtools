@@ -70,76 +70,127 @@ namespace Xamarin.MacDev {
 		/// Runs an executable and returns its stdout as a string.
 		/// Throws <see cref="InvalidOperationException"/> if the process returns a non-zero exit code.
 		/// </summary>
-		public static async Task<string> RunAsync (string executable, string arguments, CancellationToken cancellationToken = default)
+		public static async Task<string> RunAsync (string executable, CancellationToken cancellationToken, params string [] arguments)
 		{
-			using var stdout = new StringWriter ();
-			using var stderr = new StringWriter ();
+			using (var stdout = new StringWriter ())
+			using (var stderr = new StringWriter ()) {
+				var psi = CreateProcessStartInfo (executable, arguments);
 
-			var psi = new ProcessStartInfo (executable, arguments) {
-				CreateNoWindow = true,
-			};
+				var exitCode = await StartProcess (psi, stdout, stderr, cancellationToken).ConfigureAwait (false);
 
-			var exitCode = await StartProcess (psi, stdout, stderr, cancellationToken).ConfigureAwait (false);
+				if (exitCode != 0) {
+					var errorOutput = stderr.ToString ().Trim ();
+					var stdoutOutput = stdout.ToString ().Trim ();
+					var message = !string.IsNullOrEmpty (errorOutput) ? errorOutput : stdoutOutput;
+					if (string.IsNullOrEmpty (message))
+						message = $"'{Path.GetFileName (executable)}' returned exit code {exitCode}";
 
-			if (exitCode != 0) {
-				var errorOutput = stderr.ToString ().Trim ();
-				var stdoutOutput = stdout.ToString ().Trim ();
-				var message = !string.IsNullOrEmpty (errorOutput) ? errorOutput : stdoutOutput;
-				if (string.IsNullOrEmpty (message))
-					message = $"'{Path.GetFileName (executable)}' returned exit code {exitCode}";
+					throw new InvalidOperationException (message);
+				}
 
-				throw new InvalidOperationException (message);
+				return stdout.ToString ();
 			}
+		}
 
-			return stdout.ToString ();
+		/// <summary>
+		/// Runs an executable and returns its stdout as a string.
+		/// Throws <see cref="InvalidOperationException"/> if the process returns a non-zero exit code.
+		/// </summary>
+		public static Task<string> RunAsync (string executable, params string [] arguments)
+		{
+			return RunAsync (executable, CancellationToken.None, arguments);
 		}
 
 		/// <summary>
 		/// Runs an executable and returns its stdout as a trimmed string, or null if the process fails.
 		/// Does not throw on non-zero exit codes.
 		/// </summary>
-		public static async Task<string?> TryRunAsync (string executable, string arguments, CancellationToken cancellationToken = default)
+		public static async Task<string?> TryRunAsync (string executable, CancellationToken cancellationToken, params string [] arguments)
 		{
-			using var stdout = new StringWriter ();
-			using var stderr = new StringWriter ();
+			using (var stdout = new StringWriter ())
+			using (var stderr = new StringWriter ()) {
+				var psi = CreateProcessStartInfo (executable, arguments);
 
-			var psi = new ProcessStartInfo (executable, arguments) {
-				CreateNoWindow = true,
-			};
+				try {
+					var exitCode = await StartProcess (psi, stdout, stderr, cancellationToken).ConfigureAwait (false);
+					if (exitCode != 0)
+						return null;
 
-			try {
-				var exitCode = await StartProcess (psi, stdout, stderr, cancellationToken).ConfigureAwait (false);
-				if (exitCode != 0)
+					return stdout.ToString ().Trim ();
+				} catch (OperationCanceledException) {
+					throw;
+				} catch (System.ComponentModel.Win32Exception) {
 					return null;
-
-				return stdout.ToString ().Trim ();
-			} catch (OperationCanceledException) {
-				throw;
-			} catch (System.ComponentModel.Win32Exception) {
-				return null;
-			} catch (InvalidOperationException) {
-				return null;
+				} catch (InvalidOperationException) {
+					return null;
+				}
 			}
 		}
 
 		/// <summary>
-		/// Synchronous convenience wrapper around <see cref="StartProcess"/>.
-		/// Runs an executable and returns stdout/stderr and the exit code.
-		/// Uses Task.WhenAll to avoid potential deadlock when process buffer fills up.
+		/// Runs an executable and returns its stdout as a trimmed string, or null if the process fails.
+		/// Does not throw on non-zero exit codes.
 		/// </summary>
-		public static (int exitCode, string stdout, string stderr) Exec (string executable, string arguments)
+		public static Task<string?> TryRunAsync (string executable, params string [] arguments)
 		{
-			var psi = new ProcessStartInfo (executable, arguments) {
+			return TryRunAsync (executable, CancellationToken.None, arguments);
+		}
+
+		/// <summary>
+		/// Synchronous convenience wrapper.
+		/// Runs an executable and returns stdout/stderr and the exit code.
+		/// </summary>
+		public static (int exitCode, string stdout, string stderr) Exec (string executable, params string [] arguments)
+		{
+			var psi = CreateProcessStartInfo (executable, arguments);
+
+			using (var stdout = new StringWriter ())
+			using (var stderr = new StringWriter ()) {
+				var exitCode = StartProcess (psi, stdout, stderr).GetAwaiter ().GetResult ();
+
+				return (exitCode, stdout.ToString (), stderr.ToString ());
+			}
+		}
+
+		static ProcessStartInfo CreateProcessStartInfo (string executable, string [] arguments)
+		{
+			var psi = new ProcessStartInfo (executable) {
 				CreateNoWindow = true,
 			};
 
-			using var stdout = new StringWriter ();
-			using var stderr = new StringWriter ();
+#if NETSTANDARD2_0
+			psi.Arguments = QuoteArguments (arguments);
+#else
+			foreach (var arg in arguments)
+				psi.ArgumentList.Add (arg);
+#endif
 
-			var exitCode = StartProcess (psi, stdout, stderr).GetAwaiter ().GetResult ();
-
-			return (exitCode, stdout.ToString (), stderr.ToString ());
+			return psi;
 		}
+
+#if NETSTANDARD2_0
+		static string QuoteArguments (string [] arguments)
+		{
+			if (arguments.Length == 0)
+				return string.Empty;
+
+			var sb = new System.Text.StringBuilder ();
+			for (int i = 0; i < arguments.Length; i++) {
+				if (i > 0)
+					sb.Append (' ');
+
+				var arg = arguments [i];
+				if (arg.Length > 0 && arg.IndexOfAny (new [] { ' ', '\t', '"' }) < 0) {
+					sb.Append (arg);
+				} else {
+					sb.Append ('"');
+					sb.Append (arg.Replace ("\"", "\\\""));
+					sb.Append ('"');
+				}
+			}
+			return sb.ToString ();
+		}
+#endif
 
 		static void KillProcess (Process p)
 		{

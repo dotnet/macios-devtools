@@ -19,19 +19,18 @@ namespace Tests {
 		static bool IsWindows => RuntimeInformation.IsOSPlatform (OSPlatform.Windows);
 		static string ShellExe => IsWindows ? "cmd.exe" : "/bin/sh";
 
-		static string EchoArgs (string text)
+		static string [] EchoArgs (string text)
 		{
-			return IsWindows ? $"/c echo {text}" : $"-c \"echo {text}\"";
+			return IsWindows
+				? new [] { "/c", "echo", text }
+				: new [] { "-c", $"echo {text}" };
 		}
 
-		static string ExitArgs (int code)
+		static string [] ExitArgs (int code)
 		{
-			return IsWindows ? $"/c exit {code}" : $"-c \"exit {code}\"";
-		}
-
-		static string StdoutAndStderrArgs ()
-		{
-			return IsWindows ? "/c echo out& echo err >&2" : "-c \"echo out; echo err >&2\"";
+			return IsWindows
+				? new [] { "/c", $"exit {code}" }
+				: new [] { "-c", $"exit {code}" };
 		}
 
 		[Test]
@@ -67,16 +66,17 @@ namespace Tests {
 		public async Task TryRunAsync_ReturnsNullForMissingExecutable ()
 		{
 			var missingPath = IsWindows ? @"C:\nonexistent\binary.exe" : "/nonexistent/binary";
-			var result = await ProcessUtils.TryRunAsync (missingPath, "");
+			var result = await ProcessUtils.TryRunAsync (missingPath);
 			Assert.That (result, Is.Null);
 		}
 
 		[Test]
 		public async Task StartProcess_CapturesStdoutAndStderr ()
 		{
+			var shellArgs = IsWindows ? "/c echo out& echo err >&2" : "-c \"echo out; echo err >&2\"";
 			using (var stdout = new StringWriter ())
 			using (var stderr = new StringWriter ()) {
-				var psi = new System.Diagnostics.ProcessStartInfo (ShellExe, StdoutAndStderrArgs ()) {
+				var psi = new System.Diagnostics.ProcessStartInfo (ShellExe, shellArgs) {
 					CreateNoWindow = true,
 				};
 
@@ -94,9 +94,8 @@ namespace Tests {
 				cts.Cancel ();
 
 				var sleepExe = IsWindows ? "timeout" : "/bin/sleep";
-				var sleepArgs = IsWindows ? "/t 60" : "60";
 				Assert.ThrowsAsync<OperationCanceledException> (async () => {
-					await ProcessUtils.RunAsync (sleepExe, sleepArgs, cts.Token);
+					await ProcessUtils.RunAsync (sleepExe, cts.Token, IsWindows ? "/t" : "60", IsWindows ? "60" : "");
 				});
 			}
 		}
