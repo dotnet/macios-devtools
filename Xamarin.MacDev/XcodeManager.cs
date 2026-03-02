@@ -38,6 +38,12 @@ namespace Xamarin.MacDev {
 		{
 			var selectedPath = GetSelectedPath ();
 			var candidates = FindXcodeApps ();
+
+			// Ensure the selected Xcode always appears even if not found
+			// by mdfind or /Applications scan (e.g. non-standard location).
+			if (selectedPath is not null && !candidates.Contains (selectedPath))
+				candidates.Add (selectedPath);
+
 			var results = new List<XcodeInfo> ();
 			var seen = new HashSet<string> (StringComparer.Ordinal);
 
@@ -89,7 +95,12 @@ namespace Xamarin.MacDev {
 			if (selected is not null)
 				return selected;
 
-			all.Sort ((a, b) => b.Version.CompareTo (a.Version));
+			// Sort by version descending, then by build string as tiebreaker
+			// for beta Xcodes that share the same version number.
+			all.Sort ((a, b) => {
+				int cmp = b.Version.CompareTo (a.Version);
+				return cmp != 0 ? cmp : string.Compare (b.Build, a.Build, StringComparison.Ordinal);
+			});
 			return all [0];
 		}
 
@@ -109,22 +120,13 @@ namespace Xamarin.MacDev {
 				return false;
 			}
 
-			// xcode-select -s expects the Developer directory, not the .app bundle
-			var developerDir = path;
-			if (!path.EndsWith ("/Contents/Developer", StringComparison.Ordinal)
-				&& !path.EndsWith ("\\Contents\\Developer", StringComparison.Ordinal)) {
-				var candidate = Path.Combine (path, "Contents", "Developer");
-				if (Directory.Exists (candidate))
-					developerDir = candidate;
-			}
-
 			if (!File.Exists (XcodeSelectPath)) {
 				log.LogInfo ("Cannot select Xcode: xcode-select not found.");
 				return false;
 			}
 
 			try {
-				var (exitCode, _, stderr) = ProcessUtils.Exec (XcodeSelectPath, "-s", developerDir);
+				var (exitCode, _, stderr) = ProcessUtils.Exec (XcodeSelectPath, "-s", path);
 				if (exitCode != 0) {
 					log.LogInfo ("xcode-select -s returned exit code {0}: {1}", exitCode, stderr.Trim ());
 					return false;
@@ -133,6 +135,9 @@ namespace Xamarin.MacDev {
 				log.LogInfo ("Selected Xcode at '{0}'.", path);
 				return true;
 			} catch (System.ComponentModel.Win32Exception ex) {
+				log.LogInfo ("Could not run xcode-select: {0}", ex.Message);
+				return false;
+			} catch (InvalidOperationException ex) {
 				log.LogInfo ("Could not run xcode-select: {0}", ex.Message);
 				return false;
 			}
@@ -156,6 +161,8 @@ namespace Xamarin.MacDev {
 				return CanonicalizeXcodePath (path);
 			} catch (System.ComponentModel.Win32Exception) {
 				return null;
+			} catch (InvalidOperationException) {
+				return null;
 			}
 		}
 
@@ -172,13 +179,14 @@ namespace Xamarin.MacDev {
 				try {
 					var (exitCode, stdout, _) = ProcessUtils.Exec (MdfindPath, "kMDItemCFBundleIdentifier == 'com.apple.dt.Xcode'");
 					if (exitCode == 0) {
-						foreach (var rawLine in stdout.Split ('\n')) {
-							var line = rawLine.Trim ();
-							if (line.Length > 0 && Directory.Exists (line))
-								pathSet.Add (line);
+						foreach (var path in ParseMdfindOutput (stdout)) {
+							if (Directory.Exists (path))
+								pathSet.Add (path);
 						}
 					}
 				} catch (System.ComponentModel.Win32Exception ex) {
+					log.LogInfo ("Could not run mdfind: {0}", ex.Message);
+				} catch (InvalidOperationException ex) {
 					log.LogInfo ("Could not run mdfind: {0}", ex.Message);
 				}
 			}
@@ -272,13 +280,13 @@ namespace Xamarin.MacDev {
 		/// Parses the output of mdfind into a list of paths.
 		/// Exported for testing.
 		/// </summary>
-		public static List<string> ParseMdfindOutput (string output)
+		public static List<string> ParseMdfindOutput (string? output)
 		{
 			var results = new List<string> ();
 			if (string.IsNullOrEmpty (output))
 				return results;
 
-			foreach (var rawLine in output.Split ('\n')) {
+			foreach (var rawLine in output!.Split ('\n')) {
 				var line = rawLine.Trim ();
 				if (line.Length > 0)
 					results.Add (line);
