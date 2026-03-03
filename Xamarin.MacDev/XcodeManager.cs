@@ -25,7 +25,7 @@ public class XcodeManager {
 
 	public XcodeManager (ICustomLogger log)
 	{
-	this.log = log ?? throw new ArgumentNullException (nameof (log));
+		this.log = log ?? throw new ArgumentNullException (nameof (log));
 	}
 
 	/// <summary>
@@ -293,4 +293,4 @@ public class XcodeManager {
 
 		return results;
 	}
-	}
+}
