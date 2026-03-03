@@ -42,6 +42,9 @@ public static class SimctlOutputParser {
 
 				foreach (var runtimeProp in devicesElement.EnumerateObject ()) {
 					var runtimeId = runtimeProp.Name;
+					// Derive platform and version from runtime identifier
+					// e.g. "com.apple.CoreSimulator.SimRuntime.iOS-18-2" → platform="iOS", version="18.2"
+					var (platform, osVersion) = ParseRuntimeIdentifier (runtimeId);
 
 					foreach (var device in runtimeProp.Value.EnumerateArray ()) {
 						var info = new SimulatorDeviceInfo {
@@ -51,6 +54,9 @@ public static class SimctlOutputParser {
 							State = GetString (device, "state"),
 							DeviceTypeIdentifier = GetString (device, "deviceTypeIdentifier"),
 							IsAvailable = GetBool (device, "isAvailable"),
+							AvailabilityError = GetString (device, "availabilityError"),
+							Platform = platform,
+							OSVersion = osVersion,
 						};
 
 						devices.Add (info);
@@ -91,6 +97,15 @@ public static class SimctlOutputParser {
 						IsAvailable = GetBool (rt, "isAvailable"),
 						IsBundled = string.Equals (GetString (rt, "contentType"), "bundled", StringComparison.OrdinalIgnoreCase),
 					};
+
+					if (rt.TryGetProperty ("supportedArchitectures", out var archArray) &&
+						archArray.ValueKind == JsonValueKind.Array) {
+						foreach (var arch in archArray.EnumerateArray ()) {
+							var a = arch.ValueKind == JsonValueKind.String ? arch.GetString () : null;
+							if (!string.IsNullOrEmpty (a))
+								info.SupportedArchitectures.Add (a!);
+						}
+					}
 
 					runtimes.Add (info);
 				}
@@ -141,5 +156,31 @@ public static class SimctlOutputParser {
 				return string.Equals (value.GetString (), "true", StringComparison.OrdinalIgnoreCase);
 		}
 		return false;
+	}
+
+	/// <summary>
+	/// Parses a runtime identifier like "com.apple.CoreSimulator.SimRuntime.iOS-18-2"
+	/// into a (platform, version) tuple e.g. ("iOS", "18.2").
+	/// Pattern from dotnet/macios GetAvailableDevices.
+	/// </summary>
+	public static (string platform, string version) ParseRuntimeIdentifier (string identifier)
+	{
+		if (string.IsNullOrEmpty (identifier))
+			return ("", "");
+
+		// Strip prefix "com.apple.CoreSimulator.SimRuntime."
+		const string prefix = "com.apple.CoreSimulator.SimRuntime.";
+		var name = identifier.StartsWith (prefix, StringComparison.Ordinal)
+			? identifier.Substring (prefix.Length)
+			: identifier;
+
+		// Split "iOS-18-2" → ["iOS", "18", "2"]
+		var parts = name.Split ('-');
+		if (parts.Length < 2)
+			return (name, "");
+
+		var platform = parts [0];
+		var version = string.Join (".", parts, 1, parts.Length - 1);
+		return (platform, version);
 	}
 }

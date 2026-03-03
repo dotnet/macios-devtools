@@ -225,4 +225,70 @@ public class SimctlOutputParserTests {
 		// but our GetBool handles string fallback
 		Assert.That (devices.Count, Is.EqualTo (1));
 	}
+
+	[Test]
+	public void ParseDevices_DerivesAvailabilityError ()
+	{
+		var json = @"{
+  ""devices"" : {
+    ""com.apple.CoreSimulator.SimRuntime.iOS-26-0"" : [
+      {
+        ""udid"" : ""D4D95709"",
+        ""isAvailable"" : false,
+        ""availabilityError"" : ""runtime profile not found"",
+        ""deviceTypeIdentifier"" : ""com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"",
+        ""state"" : ""Shutdown"",
+        ""name"" : ""iPhone 17 Pro""
+      }
+    ]
+  }
+}";
+		var devices = SimctlOutputParser.ParseDevices (json);
+		Assert.That (devices.Count, Is.EqualTo (1));
+		Assert.That (devices [0].IsAvailable, Is.False);
+		Assert.That (devices [0].AvailabilityError, Does.Contain ("runtime profile not found"));
+		Assert.That (devices [0].Platform, Is.EqualTo ("iOS"));
+		Assert.That (devices [0].OSVersion, Is.EqualTo ("26.0"));
+	}
+
+	[Test]
+	public void ParseDevices_DerivesPlatformAndVersion ()
+	{
+		var devices = SimctlOutputParser.ParseDevices (SampleDevicesJson);
+		Assert.That (devices [0].Platform, Is.EqualTo ("iOS"));
+		Assert.That (devices [0].OSVersion, Is.EqualTo ("18.2"));
+	}
+
+	[Test]
+	public void ParseRuntimes_ParsesSupportedArchitectures ()
+	{
+		var json = @"{
+  ""runtimes"" : [
+    {
+      ""identifier"" : ""com.apple.CoreSimulator.SimRuntime.iOS-26-1"",
+      ""version"" : ""26.1"",
+      ""platform"" : ""iOS"",
+      ""isAvailable"" : true,
+      ""name"" : ""iOS 26.1"",
+      ""buildversion"" : ""23J579"",
+      ""supportedArchitectures"" : [ ""arm64"" ]
+    }
+  ]
+}";
+		var runtimes = SimctlOutputParser.ParseRuntimes (json);
+		Assert.That (runtimes.Count, Is.EqualTo (1));
+		Assert.That (runtimes [0].SupportedArchitectures, Has.Count.EqualTo (1));
+		Assert.That (runtimes [0].SupportedArchitectures [0], Is.EqualTo ("arm64"));
+	}
+
+	[TestCase ("com.apple.CoreSimulator.SimRuntime.iOS-18-2", "iOS", "18.2")]
+	[TestCase ("com.apple.CoreSimulator.SimRuntime.tvOS-26-1", "tvOS", "26.1")]
+	[TestCase ("com.apple.CoreSimulator.SimRuntime.watchOS-11-0", "watchOS", "11.0")]
+	[TestCase ("", "", "")]
+	public void ParseRuntimeIdentifier_ExtractsPlatformAndVersion (string identifier, string expectedPlatform, string expectedVersion)
+	{
+		var (platform, version) = SimctlOutputParser.ParseRuntimeIdentifier (identifier);
+		Assert.That (platform, Is.EqualTo (expectedPlatform));
+		Assert.That (version, Is.EqualTo (expectedVersion));
+	}
 }

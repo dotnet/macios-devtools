@@ -7,6 +7,7 @@ namespace Xamarin.MacDev.Models {
 
 	/// <summary>
 	/// Information about a simulator device from xcrun simctl.
+	/// Fields aligned with dotnet/macios GetAvailableDevices task.
 	/// </summary>
 	public class SimulatorDeviceInfo {
 		/// <summary>The simulator display name (e.g. "iPhone 16 Pro").</summary>
@@ -26,6 +27,15 @@ namespace Xamarin.MacDev.Models {
 
 		/// <summary>Whether this simulator is available.</summary>
 		public bool IsAvailable { get; set; }
+
+		/// <summary>Availability error message when IsAvailable is false.</summary>
+		public string AvailabilityError { get; set; } = "";
+
+		/// <summary>The runtime version for this device (e.g. "18.2"), derived from the runtime.</summary>
+		public string OSVersion { get; set; } = "";
+
+		/// <summary>The platform (e.g. "iOS", "tvOS"), derived from the runtime identifier.</summary>
+		public string Platform { get; set; } = "";
 
 		public bool IsBooted => State == "Booted";
 

@@ -30,6 +30,9 @@ namespace Xamarin.MacDev.Models {
 		/// <summary>Whether this runtime is bundled with Xcode (vs downloaded separately).</summary>
 		public bool IsBundled { get; set; }
 
+		/// <summary>CPU architectures supported by this runtime (e.g. "arm64", "x86_64").</summary>
+		public System.Collections.Generic.List<string> SupportedArchitectures { get; set; } = new System.Collections.Generic.List<string> ();
+
 		public override string ToString () => $"{Name} ({Identifier})";
 	}
 }
