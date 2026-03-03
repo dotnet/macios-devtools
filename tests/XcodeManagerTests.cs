@@ -61,5 +61,28 @@ namespace Tests {
 			Assert.That (XcodeManager.CanonicalizeXcodePath (null), Is.Null);
 			Assert.That (XcodeManager.CanonicalizeXcodePath (""), Is.Null);
 		}
+
+		[Test]
+		public void List_DoesNotThrow ()
+		{
+			var mgr = new XcodeManager (new ConsoleLogger ());
+			List<Xamarin.MacDev.Models.XcodeInfo> results = null;
+			Assert.DoesNotThrow (() => results = mgr.List ());
+			Assert.That (results, Is.Not.Null);
+		}
+
+		[Test]
+		public void GetSelected_DoesNotThrow ()
+		{
+			var mgr = new XcodeManager (new ConsoleLogger ());
+			Assert.DoesNotThrow (() => mgr.GetSelected ());
+		}
+
+		[Test]
+		public void GetBest_DoesNotThrow ()
+		{
+			var mgr = new XcodeManager (new ConsoleLogger ());
+			Assert.DoesNotThrow (() => mgr.GetBest ());
+		}
 	}
 }
