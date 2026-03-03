@@ -120,6 +120,43 @@ public static class SimctlOutputParser {
 	}
 
 	/// <summary>
+	/// Parses the JSON output of <c>xcrun simctl list devicetypes --json</c>
+	/// into a list of <see cref="SimulatorDeviceTypeInfo"/>.
+	/// </summary>
+	public static List<SimulatorDeviceTypeInfo> ParseDeviceTypes (string? json)
+	{
+		var deviceTypes = new List<SimulatorDeviceTypeInfo> ();
+		if (string.IsNullOrEmpty (json))
+			return deviceTypes;
+
+		try {
+			using (var doc = JsonDocument.Parse (json!, JsonOptions)) {
+				if (!doc.RootElement.TryGetProperty ("devicetypes", out var dtArray))
+					return deviceTypes;
+
+				foreach (var dt in dtArray.EnumerateArray ()) {
+					var info = new SimulatorDeviceTypeInfo {
+						Identifier = GetString (dt, "identifier"),
+						Name = GetString (dt, "name"),
+						ProductFamily = GetString (dt, "productFamily"),
+						MinRuntimeVersionString = GetString (dt, "minRuntimeVersionString"),
+						MaxRuntimeVersionString = GetString (dt, "maxRuntimeVersionString"),
+						ModelIdentifier = GetString (dt, "modelIdentifier"),
+					};
+
+					deviceTypes.Add (info);
+				}
+			}
+		} catch (JsonException) {
+			// Malformed simctl output — return whatever we parsed so far
+		} catch (InvalidOperationException) {
+			// Unexpected JSON structure — return partial results
+		}
+
+		return deviceTypes;
+	}
+
+	/// <summary>
 	/// Parses the UDID from the output of <c>xcrun simctl create</c>.
 	/// The command outputs just the UDID on a single line.
 	/// </summary>

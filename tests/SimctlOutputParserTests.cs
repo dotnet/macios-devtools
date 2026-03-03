@@ -291,4 +291,81 @@ public class SimctlOutputParserTests {
 		Assert.That (platform, Is.EqualTo (expectedPlatform));
 		Assert.That (version, Is.EqualTo (expectedVersion));
 	}
+
+	[Test]
+	public void ParseDeviceTypes_ValidJson_ParsesAllFields ()
+	{
+		var json = @"{
+			""devicetypes"": [
+				{
+					""productFamily"": ""iPhone"",
+					""identifier"": ""com.apple.CoreSimulator.SimDeviceType.iPhone-11"",
+					""modelIdentifier"": ""iPhone12,1"",
+					""minRuntimeVersionString"": ""13.0.0"",
+					""maxRuntimeVersionString"": ""65535.255.255"",
+					""name"": ""iPhone 11""
+				},
+				{
+					""productFamily"": ""iPad"",
+					""identifier"": ""com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB"",
+					""modelIdentifier"": ""iPad17,4"",
+					""minRuntimeVersionString"": ""26.0.0"",
+					""maxRuntimeVersionString"": ""65535.255.255"",
+					""name"": ""iPad Pro 13-inch (M5)""
+				},
+				{
+					""productFamily"": ""Apple TV"",
+					""identifier"": ""com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K"",
+					""modelIdentifier"": ""AppleTV14,1"",
+					""minRuntimeVersionString"": ""16.1.0"",
+					""maxRuntimeVersionString"": ""65535.255.255"",
+					""name"": ""Apple TV 4K (3rd generation)""
+				}
+			]
+		}";
+
+		var result = SimctlOutputParser.ParseDeviceTypes (json);
+		Assert.That (result.Count, Is.EqualTo (3));
+
+		Assert.That (result [0].Identifier, Is.EqualTo ("com.apple.CoreSimulator.SimDeviceType.iPhone-11"));
+		Assert.That (result [0].Name, Is.EqualTo ("iPhone 11"));
+		Assert.That (result [0].ProductFamily, Is.EqualTo ("iPhone"));
+		Assert.That (result [0].MinRuntimeVersionString, Is.EqualTo ("13.0.0"));
+		Assert.That (result [0].MaxRuntimeVersionString, Is.EqualTo ("65535.255.255"));
+		Assert.That (result [0].ModelIdentifier, Is.EqualTo ("iPhone12,1"));
+
+		Assert.That (result [1].ProductFamily, Is.EqualTo ("iPad"));
+		Assert.That (result [1].Name, Is.EqualTo ("iPad Pro 13-inch (M5)"));
+		Assert.That (result [1].MinRuntimeVersionString, Is.EqualTo ("26.0.0"));
+
+		Assert.That (result [2].ProductFamily, Is.EqualTo ("Apple TV"));
+		Assert.That (result [2].Name, Is.EqualTo ("Apple TV 4K (3rd generation)"));
+	}
+
+	[Test]
+	public void ParseDeviceTypes_EmptyJson_ReturnsEmptyList ()
+	{
+		Assert.That (SimctlOutputParser.ParseDeviceTypes (null).Count, Is.EqualTo (0));
+		Assert.That (SimctlOutputParser.ParseDeviceTypes ("").Count, Is.EqualTo (0));
+		Assert.That (SimctlOutputParser.ParseDeviceTypes ("{}").Count, Is.EqualTo (0));
+	}
+
+	[Test]
+	public void ParseDeviceTypes_MissingFields_ReturnsDefaults ()
+	{
+		var json = @"{
+			""devicetypes"": [
+				{
+					""identifier"": ""com.apple.CoreSimulator.SimDeviceType.iPhone-X""
+				}
+			]
+		}";
+		var result = SimctlOutputParser.ParseDeviceTypes (json);
+		Assert.That (result.Count, Is.EqualTo (1));
+		Assert.That (result [0].Identifier, Is.EqualTo ("com.apple.CoreSimulator.SimDeviceType.iPhone-X"));
+		Assert.That (result [0].Name, Is.EqualTo (""));
+		Assert.That (result [0].ProductFamily, Is.EqualTo (""));
+		Assert.That (result [0].MinRuntimeVersionString, Is.EqualTo (""));
+	}
 }
+
