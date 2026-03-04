@@ -1,0 +1,423 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using NUnit.Framework;
+using Xamarin.MacDev;
+
+#nullable enable
+
+namespace Tests;
+
+[TestFixture]
+public class SimctlOutputParserTests {
+
+	// Realistic simctl list devices --json output based on actual Apple format
+	// Structure validated against ClientTools.Platform RemoteSimulatorValidator
+	static readonly string SampleDevicesJson = @"{
+  ""devices"" : {
+    ""com.apple.CoreSimulator.SimRuntime.iOS-18-2"" : [
+      {
+        ""name"" : ""iPhone 16 Pro"",
+        ""udid"" : ""A1B2C3D4-E5F6-7890-ABCD-EF1234567890"",
+        ""state"" : ""Shutdown"",
+        ""isAvailable"" : true,
+        ""deviceTypeIdentifier"" : ""com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro""
+      },
+      {
+        ""name"" : ""iPhone 16"",
+        ""udid"" : ""B2C3D4E5-F6A7-8901-BCDE-F12345678901"",
+        ""state"" : ""Booted"",
+        ""isAvailable"" : true,
+        ""deviceTypeIdentifier"" : ""com.apple.CoreSimulator.SimDeviceType.iPhone-16""
+      }
+    ],
+    ""com.apple.CoreSimulator.SimRuntime.tvOS-18-2"" : [
+      {
+        ""name"" : ""Apple TV"",
+        ""udid"" : ""C3D4E5F6-A7B8-9012-CDEF-123456789012"",
+        ""state"" : ""Shutdown"",
+        ""isAvailable"" : false,
+        ""deviceTypeIdentifier"" : ""com.apple.CoreSimulator.SimDeviceType.Apple-TV-1080p""
+      }
+    ]
+  }
+}";
+
+	static readonly string SampleRuntimesJson = @"{
+  ""runtimes"" : [
+    {
+      ""bundlePath"" : ""/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 17.5.simruntime"",
+      ""buildversion"" : ""21F79"",
+      ""platform"" : ""iOS"",
+      ""runtimeRoot"" : ""/Library/Developer/CoreSimulator/Volumes/iOS_21F79/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 17.5.simruntime/Contents/Resources/RuntimeRoot"",
+      ""identifier"" : ""com.apple.CoreSimulator.SimRuntime.iOS-17-5"",
+      ""version"" : ""17.5"",
+      ""contentType"" : ""diskImage"",
+      ""isAvailable"" : true,
+      ""name"" : ""iOS 17.5"",
+      ""supportedDeviceTypes"" : []
+    },
+    {
+      ""bundlePath"" : ""/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS.simruntime"",
+      ""buildversion"" : ""22C150"",
+      ""platform"" : ""iOS"",
+      ""runtimeRoot"" : ""/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS.simruntime/Contents/Resources/RuntimeRoot"",
+      ""identifier"" : ""com.apple.CoreSimulator.SimRuntime.iOS-18-2"",
+      ""version"" : ""18.2"",
+      ""contentType"" : ""bundled"",
+      ""isAvailable"" : true,
+      ""name"" : ""iOS 18.2"",
+      ""supportedDeviceTypes"" : []
+    },
+    {
+      ""bundlePath"" : ""/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform/Library/Developer/CoreSimulator/Profiles/Runtimes/tvOS.simruntime"",
+      ""buildversion"" : ""22K150"",
+      ""platform"" : ""tvOS"",
+      ""runtimeRoot"" : ""/path/to/runtime"",
+      ""identifier"" : ""com.apple.CoreSimulator.SimRuntime.tvOS-18-2"",
+      ""version"" : ""18.2"",
+      ""contentType"" : ""bundled"",
+      ""isAvailable"" : false,
+      ""name"" : ""tvOS 18.2"",
+      ""supportedDeviceTypes"" : []
+    }
+  ]
+}";
+
+	[Test]
+	public void ParseDevices_ParsesMultipleRuntimes ()
+	{
+		var devices = SimctlOutputParser.ParseDevices (SampleDevicesJson);
+		Assert.That (devices.Count, Is.EqualTo (3));
+	}
+
+	[Test]
+	public void ParseDevices_SetsRuntimeIdentifier ()
+	{
+		var devices = SimctlOutputParser.ParseDevices (SampleDevicesJson);
+		Assert.That (devices [0].RuntimeIdentifier, Is.EqualTo ("com.apple.CoreSimulator.SimRuntime.iOS-18-2"));
+		Assert.That (devices [2].RuntimeIdentifier, Is.EqualTo ("com.apple.CoreSimulator.SimRuntime.tvOS-18-2"));
+	}
+
+	[Test]
+	public void ParseDevices_SetsDeviceProperties ()
+	{
+		var devices = SimctlOutputParser.ParseDevices (SampleDevicesJson);
+		var iphone16Pro = devices [0];
+		Assert.That (iphone16Pro.Name, Is.EqualTo ("iPhone 16 Pro"));
+		Assert.That (iphone16Pro.Udid, Is.EqualTo ("A1B2C3D4-E5F6-7890-ABCD-EF1234567890"));
+		Assert.That (iphone16Pro.State, Is.EqualTo ("Shutdown"));
+		Assert.That (iphone16Pro.IsAvailable, Is.True);
+		Assert.That (iphone16Pro.DeviceTypeIdentifier, Is.EqualTo ("com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro"));
+		Assert.That (iphone16Pro.IsBooted, Is.False);
+	}
+
+	[Test]
+	public void ParseDevices_DetectsBootedState ()
+	{
+		var devices = SimctlOutputParser.ParseDevices (SampleDevicesJson);
+		Assert.That (devices [1].IsBooted, Is.True);
+		Assert.That (devices [1].State, Is.EqualTo ("Booted"));
+	}
+
+	[Test]
+	public void ParseDevices_DetectsUnavailableDevices ()
+	{
+		var devices = SimctlOutputParser.ParseDevices (SampleDevicesJson);
+		Assert.That (devices [2].IsAvailable, Is.False);
+	}
+
+	[Test]
+	public void ParseDevices_ReturnsEmptyForNullOrEmpty ()
+	{
+		Assert.That (SimctlOutputParser.ParseDevices (""), Is.Empty);
+		Assert.That (SimctlOutputParser.ParseDevices (null!), Is.Empty);
+	}
+
+	[Test]
+	public void ParseDevices_ReturnsEmptyForNoDevicesKey ()
+	{
+		Assert.That (SimctlOutputParser.ParseDevices ("{}"), Is.Empty);
+	}
+
+	[Test]
+	public void ParseRuntimes_ParsesMultipleRuntimes ()
+	{
+		var runtimes = SimctlOutputParser.ParseRuntimes (SampleRuntimesJson);
+		Assert.That (runtimes.Count, Is.EqualTo (3));
+	}
+
+	[Test]
+	public void ParseRuntimes_SetsRuntimeProperties ()
+	{
+		var runtimes = SimctlOutputParser.ParseRuntimes (SampleRuntimesJson);
+		var ios175 = runtimes [0];
+		Assert.That (ios175.Name, Is.EqualTo ("iOS 17.5"));
+		Assert.That (ios175.Identifier, Is.EqualTo ("com.apple.CoreSimulator.SimRuntime.iOS-17-5"));
+		Assert.That (ios175.Version, Is.EqualTo ("17.5"));
+		Assert.That (ios175.BuildVersion, Is.EqualTo ("21F79"));
+		Assert.That (ios175.Platform, Is.EqualTo ("iOS"));
+		Assert.That (ios175.IsAvailable, Is.True);
+		Assert.That (ios175.IsBundled, Is.False);
+	}
+
+	[Test]
+	public void ParseRuntimes_DetectsBundledRuntime ()
+	{
+		var runtimes = SimctlOutputParser.ParseRuntimes (SampleRuntimesJson);
+		Assert.That (runtimes [0].IsBundled, Is.False);
+		Assert.That (runtimes [1].IsBundled, Is.True);
+	}
+
+	[Test]
+	public void ParseRuntimes_DetectsUnavailableRuntime ()
+	{
+		var runtimes = SimctlOutputParser.ParseRuntimes (SampleRuntimesJson);
+		Assert.That (runtimes [2].IsAvailable, Is.False);
+		Assert.That (runtimes [2].Platform, Is.EqualTo ("tvOS"));
+	}
+
+	[Test]
+	public void ParseRuntimes_ReturnsEmptyForNullOrEmpty ()
+	{
+		Assert.That (SimctlOutputParser.ParseRuntimes (""), Is.Empty);
+		Assert.That (SimctlOutputParser.ParseRuntimes (null!), Is.Empty);
+	}
+
+	[Test]
+	public void ParseRuntimes_ReturnsEmptyForNoRuntimesKey ()
+	{
+		Assert.That (SimctlOutputParser.ParseRuntimes ("{}"), Is.Empty);
+	}
+
+	[Test]
+	public void ParseCreateOutput_ReturnsUdid ()
+	{
+		Assert.That (SimctlOutputParser.ParseCreateOutput ("A1B2C3D4-E5F6-7890-ABCD-EF1234567890\n"),
+			Is.EqualTo ("A1B2C3D4-E5F6-7890-ABCD-EF1234567890"));
+	}
+
+	[Test]
+	public void ParseCreateOutput_ReturnsNullForEmpty ()
+	{
+		Assert.That (SimctlOutputParser.ParseCreateOutput (""), Is.Null);
+		Assert.That (SimctlOutputParser.ParseCreateOutput (null!), Is.Null);
+	}
+
+	[Test]
+	public void ParseDevices_HandlesBoolAsString ()
+	{
+		// simctl sometimes returns isAvailable as a string (observed in
+		// Redth/AppleDev.Tools FlexibleStringConverter)
+		var json = @"{
+  ""devices"" : {
+    ""com.apple.CoreSimulator.SimRuntime.iOS-17-0"" : [
+      {
+        ""name"" : ""iPhone 15"",
+        ""udid"" : ""12345"",
+        ""state"" : ""Shutdown"",
+        ""isAvailable"" : ""true"",
+        ""deviceTypeIdentifier"" : ""com.apple.CoreSimulator.SimDeviceType.iPhone-15""
+      }
+    ]
+  }
+}";
+		var devices = SimctlOutputParser.ParseDevices (json);
+		// isAvailable as string "true" won't match JsonValueKind.True,
+		// but our GetBool handles string fallback
+		Assert.That (devices.Count, Is.EqualTo (1));
+		Assert.That (devices [0].IsAvailable, Is.True);
+	}
+
+	[Test]
+	public void ParseDevices_DerivesAvailabilityError ()
+	{
+		var json = @"{
+  ""devices"" : {
+    ""com.apple.CoreSimulator.SimRuntime.iOS-26-0"" : [
+      {
+        ""udid"" : ""D4D95709"",
+        ""isAvailable"" : false,
+        ""availabilityError"" : ""runtime profile not found"",
+        ""deviceTypeIdentifier"" : ""com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"",
+        ""state"" : ""Shutdown"",
+        ""name"" : ""iPhone 17 Pro""
+      }
+    ]
+  }
+}";
+		var devices = SimctlOutputParser.ParseDevices (json);
+		Assert.That (devices.Count, Is.EqualTo (1));
+		Assert.That (devices [0].IsAvailable, Is.False);
+		Assert.That (devices [0].AvailabilityError, Does.Contain ("runtime profile not found"));
+		Assert.That (devices [0].Platform, Is.EqualTo ("iOS"));
+		Assert.That (devices [0].OSVersion, Is.EqualTo ("26.0"));
+	}
+
+	[Test]
+	public void ParseDevices_DerivesPlatformAndVersion ()
+	{
+		var devices = SimctlOutputParser.ParseDevices (SampleDevicesJson);
+		Assert.That (devices [0].Platform, Is.EqualTo ("iOS"));
+		Assert.That (devices [0].OSVersion, Is.EqualTo ("18.2"));
+	}
+
+	[Test]
+	public void ParseRuntimes_ParsesSupportedArchitectures ()
+	{
+		var json = @"{
+  ""runtimes"" : [
+    {
+      ""identifier"" : ""com.apple.CoreSimulator.SimRuntime.iOS-26-1"",
+      ""version"" : ""26.1"",
+      ""platform"" : ""iOS"",
+      ""isAvailable"" : true,
+      ""name"" : ""iOS 26.1"",
+      ""buildversion"" : ""23J579"",
+      ""supportedArchitectures"" : [ ""arm64"" ]
+    }
+  ]
+}";
+		var runtimes = SimctlOutputParser.ParseRuntimes (json);
+		Assert.That (runtimes.Count, Is.EqualTo (1));
+		Assert.That (runtimes [0].SupportedArchitectures, Has.Count.EqualTo (1));
+		Assert.That (runtimes [0].SupportedArchitectures [0], Is.EqualTo ("arm64"));
+	}
+
+	[TestCase ("com.apple.CoreSimulator.SimRuntime.iOS-18-2", "iOS", "18.2")]
+	[TestCase ("com.apple.CoreSimulator.SimRuntime.tvOS-26-1", "tvOS", "26.1")]
+	[TestCase ("com.apple.CoreSimulator.SimRuntime.watchOS-11-0", "watchOS", "11.0")]
+	[TestCase ("", "", "")]
+	public void ParseRuntimeIdentifier_ExtractsPlatformAndVersion (string identifier, string expectedPlatform, string expectedVersion)
+	{
+		var (platform, version) = SimctlOutputParser.ParseRuntimeIdentifier (identifier);
+		Assert.That (platform, Is.EqualTo (expectedPlatform));
+		Assert.That (version, Is.EqualTo (expectedVersion));
+	}
+
+	[Test]
+	public void ParseDeviceTypes_ValidJson_ParsesAllFields ()
+	{
+		var json = @"{
+			""devicetypes"": [
+				{
+					""productFamily"": ""iPhone"",
+					""identifier"": ""com.apple.CoreSimulator.SimDeviceType.iPhone-11"",
+					""modelIdentifier"": ""iPhone12,1"",
+					""minRuntimeVersionString"": ""13.0.0"",
+					""maxRuntimeVersionString"": ""65535.255.255"",
+					""name"": ""iPhone 11""
+				},
+				{
+					""productFamily"": ""iPad"",
+					""identifier"": ""com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB"",
+					""modelIdentifier"": ""iPad17,4"",
+					""minRuntimeVersionString"": ""26.0.0"",
+					""maxRuntimeVersionString"": ""65535.255.255"",
+					""name"": ""iPad Pro 13-inch (M5)""
+				},
+				{
+					""productFamily"": ""Apple TV"",
+					""identifier"": ""com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K"",
+					""modelIdentifier"": ""AppleTV14,1"",
+					""minRuntimeVersionString"": ""16.1.0"",
+					""maxRuntimeVersionString"": ""65535.255.255"",
+					""name"": ""Apple TV 4K (3rd generation)""
+				}
+			]
+		}";
+
+		var result = SimctlOutputParser.ParseDeviceTypes (json);
+		Assert.That (result.Count, Is.EqualTo (3));
+
+		Assert.That (result [0].Identifier, Is.EqualTo ("com.apple.CoreSimulator.SimDeviceType.iPhone-11"));
+		Assert.That (result [0].Name, Is.EqualTo ("iPhone 11"));
+		Assert.That (result [0].ProductFamily, Is.EqualTo ("iPhone"));
+		Assert.That (result [0].MinRuntimeVersionString, Is.EqualTo ("13.0.0"));
+		Assert.That (result [0].MaxRuntimeVersionString, Is.EqualTo ("65535.255.255"));
+		Assert.That (result [0].ModelIdentifier, Is.EqualTo ("iPhone12,1"));
+
+		Assert.That (result [1].ProductFamily, Is.EqualTo ("iPad"));
+		Assert.That (result [1].Name, Is.EqualTo ("iPad Pro 13-inch (M5)"));
+		Assert.That (result [1].MinRuntimeVersionString, Is.EqualTo ("26.0.0"));
+
+		Assert.That (result [2].ProductFamily, Is.EqualTo ("Apple TV"));
+		Assert.That (result [2].Name, Is.EqualTo ("Apple TV 4K (3rd generation)"));
+	}
+
+	[Test]
+	public void ParseDeviceTypes_EmptyJson_ReturnsEmptyList ()
+	{
+		Assert.That (SimctlOutputParser.ParseDeviceTypes (null).Count, Is.EqualTo (0));
+		Assert.That (SimctlOutputParser.ParseDeviceTypes ("").Count, Is.EqualTo (0));
+		Assert.That (SimctlOutputParser.ParseDeviceTypes ("{}").Count, Is.EqualTo (0));
+	}
+
+	[Test]
+	public void ParseDeviceTypes_MissingFields_ReturnsDefaults ()
+	{
+		var json = @"{
+			""devicetypes"": [
+				{
+					""identifier"": ""com.apple.CoreSimulator.SimDeviceType.iPhone-X""
+				}
+			]
+		}";
+		var result = SimctlOutputParser.ParseDeviceTypes (json);
+		Assert.That (result.Count, Is.EqualTo (1));
+		Assert.That (result [0].Identifier, Is.EqualTo ("com.apple.CoreSimulator.SimDeviceType.iPhone-X"));
+		Assert.That (result [0].Name, Is.EqualTo (""));
+		Assert.That (result [0].ProductFamily, Is.EqualTo (""));
+		Assert.That (result [0].MinRuntimeVersionString, Is.EqualTo (""));
+	}
+
+	[Test]
+	[Platform ("MacOsX")]
+	public void LiveSimctlList_ParsesWithoutExceptions ()
+	{
+		// Run actual simctl list on the machine and verify parsing succeeds
+		// with no exceptions logged — per rolfbjarne review feedback
+		var logger = new TestLogger ();
+		var simctl = new SimCtl (logger);
+		var json = simctl.Run ("list", "--json");
+		Assert.That (json, Is.Not.Null, "simctl list --json should return output");
+
+		var devices = SimctlOutputParser.ParseDevices (json, logger);
+		var runtimes = SimctlOutputParser.ParseRuntimes (json, logger);
+		var deviceTypes = SimctlOutputParser.ParseDeviceTypes (json, logger);
+
+		Assert.That (devices, Is.Not.Null, "Devices list should not be null");
+		Assert.That (runtimes, Is.Not.Null, "Runtimes list should not be null");
+		Assert.That (deviceTypes, Is.Not.Null, "Device types list should not be null");
+		Assert.That (logger.Errors, Is.Empty, "No errors should be logged during parsing: " + string.Join ("; ", logger.Errors));
+	}
+
+	/// <summary>
+	/// Test logger that captures error/warning messages for assertion.
+	/// </summary>
+	class TestLogger : ICustomLogger {
+		public System.Collections.Generic.List<string> Errors { get; } = new System.Collections.Generic.List<string> ();
+
+		public void LogError (string message, System.Exception? ex)
+		{
+			Errors.Add (ex is null ? message : $"{message}: {ex.Message}");
+		}
+
+		public void LogWarning (string messageFormat, params object? [] args)
+		{
+			var msg = string.Format (messageFormat, args);
+			if (msg.Contains ("failed:") || msg.Contains ("Could not"))
+				Errors.Add (msg);
+		}
+
+		public void LogInfo (string messageFormat, params object? [] args)
+		{
+			var msg = string.Format (messageFormat, args);
+			if (msg.Contains ("failed:") || msg.Contains ("Could not"))
+				Errors.Add (msg);
+		}
+
+		public void LogDebug (string messageFormat, params object? [] args) { }
+	}
+}
+
