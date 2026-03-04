@@ -29,7 +29,7 @@ public static class SimctlOutputParser {
 	/// Device keys are runtime identifiers like
 	/// "com.apple.CoreSimulator.SimRuntime.iOS-18-2".
 	/// </summary>
-	public static List<SimulatorDeviceInfo> ParseDevices (string? json)
+	public static List<SimulatorDeviceInfo> ParseDevices (string? json, ICustomLogger? log = null)
 	{
 		var devices = new List<SimulatorDeviceInfo> ();
 		if (string.IsNullOrEmpty (json))
@@ -63,10 +63,10 @@ public static class SimctlOutputParser {
 					}
 				}
 			}
-		} catch (JsonException) {
-			// Malformed simctl output — return whatever we parsed so far
-		} catch (InvalidOperationException) {
-			// Unexpected JSON structure (e.g. wrong ValueKind) — return partial results
+		} catch (JsonException ex) {
+			log?.LogInfo ("SimctlOutputParser.ParseDevices failed: {0}", ex.Message);
+		} catch (InvalidOperationException ex) {
+			log?.LogInfo ("SimctlOutputParser.ParseDevices failed: {0}", ex.Message);
 		}
 
 		return devices;
@@ -76,7 +76,7 @@ public static class SimctlOutputParser {
 	/// Parses the JSON output of <c>xcrun simctl list runtimes --json</c>
 	/// into a list of <see cref="SimulatorRuntimeInfo"/>.
 	/// </summary>
-	public static List<SimulatorRuntimeInfo> ParseRuntimes (string? json)
+	public static List<SimulatorRuntimeInfo> ParseRuntimes (string? json, ICustomLogger? log = null)
 	{
 		var runtimes = new List<SimulatorRuntimeInfo> ();
 		if (string.IsNullOrEmpty (json))
@@ -110,10 +110,10 @@ public static class SimctlOutputParser {
 					runtimes.Add (info);
 				}
 			}
-		} catch (JsonException) {
-			// Malformed simctl output — return whatever we parsed so far
-		} catch (InvalidOperationException) {
-			// Unexpected JSON structure (e.g. wrong ValueKind) — return partial results
+		} catch (JsonException ex) {
+			log?.LogInfo ("SimctlOutputParser.ParseRuntimes failed: {0}", ex.Message);
+		} catch (InvalidOperationException ex) {
+			log?.LogInfo ("SimctlOutputParser.ParseRuntimes failed: {0}", ex.Message);
 		}
 
 		return runtimes;
@@ -123,7 +123,7 @@ public static class SimctlOutputParser {
 	/// Parses the JSON output of <c>xcrun simctl list devicetypes --json</c>
 	/// into a list of <see cref="SimulatorDeviceTypeInfo"/>.
 	/// </summary>
-	public static List<SimulatorDeviceTypeInfo> ParseDeviceTypes (string? json)
+	public static List<SimulatorDeviceTypeInfo> ParseDeviceTypes (string? json, ICustomLogger? log = null)
 	{
 		var deviceTypes = new List<SimulatorDeviceTypeInfo> ();
 		if (string.IsNullOrEmpty (json))
@@ -147,10 +147,10 @@ public static class SimctlOutputParser {
 					deviceTypes.Add (info);
 				}
 			}
-		} catch (JsonException) {
-			// Malformed simctl output — return whatever we parsed so far
-		} catch (InvalidOperationException) {
-			// Unexpected JSON structure — return partial results
+		} catch (JsonException ex) {
+			log?.LogInfo ("SimctlOutputParser.ParseDeviceTypes failed: {0}", ex.Message);
+		} catch (InvalidOperationException ex) {
+			log?.LogInfo ("SimctlOutputParser.ParseDeviceTypes failed: {0}", ex.Message);
 		}
 
 		return deviceTypes;

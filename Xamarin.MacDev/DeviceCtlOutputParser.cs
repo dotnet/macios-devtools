@@ -26,7 +26,7 @@ public static class DeviceCtlOutputParser {
 	/// Parses the JSON output of <c>xcrun devicectl list devices</c>
 	/// into a list of <see cref="PhysicalDeviceInfo"/>.
 	/// </summary>
-	public static List<PhysicalDeviceInfo> ParseDevices (string? json)
+	public static List<PhysicalDeviceInfo> ParseDevices (string? json, ICustomLogger? log = null)
 	{
 		var devices = new List<PhysicalDeviceInfo> ();
 		if (string.IsNullOrEmpty (json))
@@ -86,10 +86,10 @@ public static class DeviceCtlOutputParser {
 					devices.Add (info);
 				}
 			}
-		} catch (JsonException) {
-			// Malformed devicectl output — return whatever we parsed so far
-		} catch (InvalidOperationException) {
-			// Unexpected JSON structure — return partial results
+		} catch (JsonException ex) {
+			log?.LogInfo ("DeviceCtlOutputParser.ParseDevices failed: {0}", ex.Message);
+		} catch (InvalidOperationException ex) {
+			log?.LogInfo ("DeviceCtlOutputParser.ParseDevices failed: {0}", ex.Message);
 		}
 
 		return devices;

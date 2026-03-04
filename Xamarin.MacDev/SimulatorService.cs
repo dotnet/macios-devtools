@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Xamarin.MacDev.Models;
 
 #nullable enable
@@ -18,13 +17,13 @@ namespace Xamarin.MacDev;
 /// </summary>
 public class SimulatorService {
 
-	static readonly string XcrunPath = "/usr/bin/xcrun";
-
 	readonly ICustomLogger log;
+	readonly SimCtl simctl;
 
 	public SimulatorService (ICustomLogger log)
 	{
 		this.log = log ?? throw new ArgumentNullException (nameof (log));
+		simctl = new SimCtl (log);
 	}
 
 	/// <summary>
@@ -32,7 +31,7 @@ public class SimulatorService {
 	/// </summary>
 	public List<SimulatorDeviceInfo> List (bool availableOnly = false)
 	{
-		var json = RunSimctl ("list", "devices", "--json");
+		var json = simctl.Run ("list", "devices", "--json");
 		if (json is null)
 			return new List<SimulatorDeviceInfo> ();
 
@@ -58,9 +57,9 @@ public class SimulatorService {
 
 		string? output;
 		if (!string.IsNullOrEmpty (runtimeIdentifier))
-			output = RunSimctl ("create", name, deviceTypeIdentifier, runtimeIdentifier!);
+			output = simctl.Run ("create", name, deviceTypeIdentifier, runtimeIdentifier!);
 		else
-			output = RunSimctl ("create", name, deviceTypeIdentifier);
+			output = simctl.Run ("create", name, deviceTypeIdentifier);
 
 		if (output is null)
 			return null;
@@ -108,42 +107,9 @@ public class SimulatorService {
 		return RunSimctlBool ("delete", udidOrName);
 	}
 
-	/// <summary>
-	/// Runs a simctl subcommand and returns stdout, or null on failure.
-	/// </summary>
-	string? RunSimctl (params string [] args)
-	{
-		if (!File.Exists (XcrunPath)) {
-			log.LogInfo ("xcrun not found at '{0}'.", XcrunPath);
-			return null;
-		}
-
-		var fullArgs = new string [args.Length + 1];
-		fullArgs [0] = "simctl";
-		Array.Copy (args, 0, fullArgs, 1, args.Length);
-
-		try {
-			var (exitCode, stdout, stderr) = ProcessUtils.Exec (XcrunPath, fullArgs);
-			if (exitCode != 0) {
-				log.LogInfo ("simctl {0} failed (exit {1}): {2}", args [0], exitCode, stderr.Trim ());
-				return null;
-			}
-			return stdout;
-		} catch (System.ComponentModel.Win32Exception ex) {
-			log.LogInfo ("Could not run xcrun: {0}", ex.Message);
-			return null;
-		} catch (InvalidOperationException ex) {
-			log.LogInfo ("Could not run xcrun: {0}", ex.Message);
-			return null;
-		}
-	}
-
-	/// <summary>
-	/// Runs a simctl subcommand and returns whether it succeeded.
-	/// </summary>
 	bool RunSimctlBool (string subcommand, string target)
 	{
-		var result = RunSimctl (subcommand, target);
+		var result = simctl.Run (subcommand, target);
 		var success = result is not null;
 		if (success)
 			log.LogInfo ("simctl {0} '{1}' succeeded.", subcommand, target);

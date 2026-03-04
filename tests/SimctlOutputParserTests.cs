@@ -4,6 +4,8 @@
 using NUnit.Framework;
 using Xamarin.MacDev;
 
+#nullable enable
+
 namespace Tests;
 
 [TestFixture]
@@ -129,7 +131,7 @@ public class SimctlOutputParserTests {
 	public void ParseDevices_ReturnsEmptyForNullOrEmpty ()
 	{
 		Assert.That (SimctlOutputParser.ParseDevices (""), Is.Empty);
-		Assert.That (SimctlOutputParser.ParseDevices ((string) null), Is.Empty);
+		Assert.That (SimctlOutputParser.ParseDevices (null!), Is.Empty);
 	}
 
 	[Test]
@@ -179,7 +181,7 @@ public class SimctlOutputParserTests {
 	public void ParseRuntimes_ReturnsEmptyForNullOrEmpty ()
 	{
 		Assert.That (SimctlOutputParser.ParseRuntimes (""), Is.Empty);
-		Assert.That (SimctlOutputParser.ParseRuntimes ((string) null), Is.Empty);
+		Assert.That (SimctlOutputParser.ParseRuntimes (null!), Is.Empty);
 	}
 
 	[Test]
@@ -199,7 +201,7 @@ public class SimctlOutputParserTests {
 	public void ParseCreateOutput_ReturnsNullForEmpty ()
 	{
 		Assert.That (SimctlOutputParser.ParseCreateOutput (""), Is.Null);
-		Assert.That (SimctlOutputParser.ParseCreateOutput ((string) null), Is.Null);
+		Assert.That (SimctlOutputParser.ParseCreateOutput (null!), Is.Null);
 	}
 
 	[Test]
@@ -366,6 +368,55 @@ public class SimctlOutputParserTests {
 		Assert.That (result [0].Name, Is.EqualTo (""));
 		Assert.That (result [0].ProductFamily, Is.EqualTo (""));
 		Assert.That (result [0].MinRuntimeVersionString, Is.EqualTo (""));
+	}
+
+	[Test]
+	[Platform ("MacOsX")]
+	public void LiveSimctlList_ParsesWithoutExceptions ()
+	{
+		// Run actual simctl list on the machine and verify parsing succeeds
+		// with no exceptions logged — per rolfbjarne review feedback
+		var logger = new TestLogger ();
+		var simctl = new SimCtl (logger);
+		var json = simctl.Run ("list", "--json");
+		Assert.That (json, Is.Not.Null, "simctl list --json should return output");
+
+		var devices = SimctlOutputParser.ParseDevices (json, logger);
+		var runtimes = SimctlOutputParser.ParseRuntimes (json, logger);
+		var deviceTypes = SimctlOutputParser.ParseDeviceTypes (json, logger);
+
+		Assert.That (devices.Count, Is.GreaterThan (0), "Should find at least one simulator device");
+		Assert.That (runtimes.Count, Is.GreaterThan (0), "Should find at least one runtime");
+		Assert.That (deviceTypes.Count, Is.GreaterThan (0), "Should find at least one device type");
+		Assert.That (logger.Errors, Is.Empty, "No errors should be logged during parsing: " + string.Join ("; ", logger.Errors));
+	}
+
+	/// <summary>
+	/// Test logger that captures error/warning messages for assertion.
+	/// </summary>
+	class TestLogger : ICustomLogger {
+		public System.Collections.Generic.List<string> Errors { get; } = new System.Collections.Generic.List<string> ();
+
+		public void LogError (string message, System.Exception? ex)
+		{
+			Errors.Add (ex is null ? message : $"{message}: {ex.Message}");
+		}
+
+		public void LogWarning (string messageFormat, params object? [] args)
+		{
+			var msg = string.Format (messageFormat, args);
+			if (msg.Contains ("failed:") || msg.Contains ("Could not"))
+				Errors.Add (msg);
+		}
+
+		public void LogInfo (string messageFormat, params object? [] args)
+		{
+			var msg = string.Format (messageFormat, args);
+			if (msg.Contains ("failed:") || msg.Contains ("Could not"))
+				Errors.Add (msg);
+		}
+
+		public void LogDebug (string messageFormat, params object? [] args) { }
 	}
 }
 
