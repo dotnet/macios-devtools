@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Xamarin.MacDev.Models;
 
@@ -19,10 +18,12 @@ public class RuntimeService {
 	static readonly string XcrunPath = "/usr/bin/xcrun";
 
 	readonly ICustomLogger log;
+	readonly SimCtl simctl;
 
 	public RuntimeService (ICustomLogger log)
 	{
 		this.log = log ?? throw new ArgumentNullException (nameof (log));
+		simctl = new SimCtl (log);
 	}
 
 	/// <summary>
@@ -30,11 +31,11 @@ public class RuntimeService {
 	/// </summary>
 	public List<SimulatorRuntimeInfo> List (bool availableOnly = false)
 	{
-		var json = RunSimctl ("list", "runtimes", "--json");
+		var json = simctl.Run ("list", "runtimes", "--json");
 		if (json is null)
 			return new List<SimulatorRuntimeInfo> ();
 
-		var runtimes = SimctlOutputParser.ParseRuntimes (json);
+		var runtimes = SimctlOutputParser.ParseRuntimes (json, log);
 
 		if (availableOnly)
 			runtimes.RemoveAll (r => !r.IsAvailable);
@@ -73,6 +74,7 @@ public class RuntimeService {
 				? new [] { "xcodebuild", "-downloadPlatform", platform }
 				: new [] { "xcodebuild", "-downloadPlatform", platform, "-buildVersion", version! };
 
+			log.LogInfo ("Executing: {0} {1}", XcrunPath, string.Join (" ", args));
 			var (exitCode, _, stderr) = ProcessUtils.Exec (XcrunPath, args);
 			if (exitCode != 0) {
 				log.LogInfo ("xcodebuild -downloadPlatform {0} failed (exit {1}): {2}", platform, exitCode, stderr.Trim ());
@@ -87,36 +89,6 @@ public class RuntimeService {
 		} catch (InvalidOperationException ex) {
 			log.LogInfo ("Could not run xcodebuild: {0}", ex.Message);
 			return false;
-		}
-	}
-
-	/// <summary>
-	/// Runs a simctl subcommand and returns stdout, or null on failure.
-	/// </summary>
-	string? RunSimctl (params string [] args)
-	{
-		if (!File.Exists (XcrunPath)) {
-			log.LogInfo ("xcrun not found at '{0}'.", XcrunPath);
-			return null;
-		}
-
-		var fullArgs = new string [args.Length + 1];
-		fullArgs [0] = "simctl";
-		Array.Copy (args, 0, fullArgs, 1, args.Length);
-
-		try {
-			var (exitCode, stdout, stderr) = ProcessUtils.Exec (XcrunPath, fullArgs);
-			if (exitCode != 0) {
-				log.LogInfo ("simctl {0} failed (exit {1}): {2}", args [0], exitCode, stderr.Trim ());
-				return null;
-			}
-			return stdout;
-		} catch (System.ComponentModel.Win32Exception ex) {
-			log.LogInfo ("Could not run xcrun: {0}", ex.Message);
-			return null;
-		} catch (InvalidOperationException ex) {
-			log.LogInfo ("Could not run xcrun: {0}", ex.Message);
-			return null;
 		}
 	}
 }
