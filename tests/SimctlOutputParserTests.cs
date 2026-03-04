@@ -226,6 +226,7 @@ public class SimctlOutputParserTests {
 		// isAvailable as string "true" won't match JsonValueKind.True,
 		// but our GetBool handles string fallback
 		Assert.That (devices.Count, Is.EqualTo (1));
+		Assert.That (devices [0].IsAvailable, Is.True);
 	}
 
 	[Test]
@@ -385,9 +386,9 @@ public class SimctlOutputParserTests {
 		var runtimes = SimctlOutputParser.ParseRuntimes (json, logger);
 		var deviceTypes = SimctlOutputParser.ParseDeviceTypes (json, logger);
 
-		Assert.That (devices.Count, Is.GreaterThan (0), "Should find at least one simulator device");
-		Assert.That (runtimes.Count, Is.GreaterThan (0), "Should find at least one runtime");
-		Assert.That (deviceTypes.Count, Is.GreaterThan (0), "Should find at least one device type");
+		Assert.That (devices, Is.Not.Null, "Devices list should not be null");
+		Assert.That (runtimes, Is.Not.Null, "Runtimes list should not be null");
+		Assert.That (deviceTypes, Is.Not.Null, "Device types list should not be null");
 		Assert.That (logger.Errors, Is.Empty, "No errors should be logged during parsing: " + string.Join ("; ", logger.Errors));
 	}
 

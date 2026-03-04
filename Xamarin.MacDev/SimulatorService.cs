@@ -35,7 +35,7 @@ public class SimulatorService {
 		if (json is null)
 			return new List<SimulatorDeviceInfo> ();
 
-		var devices = SimctlOutputParser.ParseDevices (json);
+		var devices = SimctlOutputParser.ParseDevices (json, log);
 
 		if (availableOnly)
 			devices.RemoveAll (d => !d.IsAvailable);
