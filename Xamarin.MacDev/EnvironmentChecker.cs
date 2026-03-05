@@ -33,33 +33,29 @@ public class EnvironmentChecker {
 	{
 		var result = new EnvironmentCheckResult ();
 
-		var xcodeManager = new XcodeManager (log);
-		var xcode = xcodeManager.GetBest ();
-		result.Xcode = xcode;
+		result.Xcode = GetBestXcode ();
 
-		if (xcode is not null) {
-			log.LogInfo ("Xcode {0} found at '{1}'.", xcode.Version, xcode.Path);
+		if (result.Xcode is not null) {
+			log.LogInfo ("Xcode {0} found at '{1}'.", result.Xcode.Version, result.Xcode.Path);
 
 			if (IsXcodeLicenseAccepted ())
 				log.LogInfo ("Xcode license is accepted.");
 			else
 				log.LogInfo ("Xcode license may not be accepted. Run 'sudo xcodebuild -license accept'.");
 
-			result.Platforms = GetPlatforms (xcode.Path);
+			result.Platforms = GetPlatforms (result.Xcode.Path);
 		} else {
 			log.LogInfo ("No Xcode installation found.");
 		}
 
 		try {
-			var clt = new CommandLineTools (log);
-			result.CommandLineTools = clt.Check ();
+			result.CommandLineTools = CheckCommandLineTools ();
 		} catch (Exception ex) {
 			log.LogInfo ("Could not check Command Line Tools: {0}", ex.Message);
 		}
 
 		try {
-			var runtimeService = new RuntimeService (log);
-			result.Runtimes = runtimeService.List (availableOnly: true);
+			result.Runtimes = ListRuntimes ();
 		} catch (Exception ex) {
 			log.LogInfo ("Could not check runtimes: {0}", ex.Message);
 		}
@@ -71,10 +67,37 @@ public class EnvironmentChecker {
 	}
 
 	/// <summary>
+	/// Returns the best available Xcode installation, or null if none found.
+	/// </summary>
+	protected virtual XcodeInfo? GetBestXcode ()
+	{
+		var xcodeManager = new XcodeManager (log);
+		return xcodeManager.GetBest ();
+	}
+
+	/// <summary>
+	/// Checks Command Line Tools installation status.
+	/// </summary>
+	protected virtual CommandLineToolsInfo CheckCommandLineTools ()
+	{
+		var clt = new CommandLineTools (log);
+		return clt.Check ();
+	}
+
+	/// <summary>
+	/// Lists available simulator runtimes.
+	/// </summary>
+	protected virtual List<SimulatorRuntimeInfo> ListRuntimes ()
+	{
+		var runtimeService = new RuntimeService (log);
+		return runtimeService.List (availableOnly: true);
+	}
+
+	/// <summary>
 	/// Checks whether the Xcode license has been accepted by running
 	/// <c>xcrun xcodebuild -license check</c>.
 	/// </summary>
-	public bool IsXcodeLicenseAccepted ()
+	public virtual bool IsXcodeLicenseAccepted ()
 	{
 		try {
 			var (exitCode, _, _) = ProcessUtils.Exec (XcrunPath, "xcodebuild", "-license", "check");
@@ -114,25 +137,37 @@ public class EnvironmentChecker {
 	/// <summary>
 	/// Gets the list of available platform SDK directories in the Xcode bundle.
 	/// </summary>
-	List<string> GetPlatforms (string xcodePath)
+	protected virtual List<string> GetPlatforms (string xcodePath)
 	{
-		var platforms = new List<string> ();
 		var platformsDir = Path.Combine (xcodePath, "Contents", "Developer", "Platforms");
 
 		if (!Directory.Exists (platformsDir))
-			return platforms;
+			return new List<string> ();
 
 		try {
-			foreach (var dir in Directory.GetDirectories (platformsDir, "*.platform")) {
-				var name = Path.GetFileNameWithoutExtension (dir);
-				var friendly = MapPlatformName (name);
-				if (!platforms.Contains (friendly))
-					platforms.Add (friendly);
-			}
+			var directoryNames = new List<string> ();
+			foreach (var dir in Directory.GetDirectories (platformsDir, "*.platform"))
+				directoryNames.Add (Path.GetFileNameWithoutExtension (dir));
+
+			return MapDirectoryNamesToPlatforms (directoryNames);
 		} catch (UnauthorizedAccessException ex) {
 			log.LogInfo ("Could not read platforms directory: {0}", ex.Message);
+			return new List<string> ();
 		}
+	}
 
+	/// <summary>
+	/// Maps a list of Apple platform directory names (e.g. "iPhoneOS", "MacOSX")
+	/// to deduplicated friendly names (e.g. "iOS", "macOS").
+	/// </summary>
+	public static List<string> MapDirectoryNamesToPlatforms (IEnumerable<string> directoryNames)
+	{
+		var platforms = new List<string> ();
+		foreach (var name in directoryNames) {
+			var friendly = MapPlatformName (name);
+			if (!platforms.Contains (friendly))
+				platforms.Add (friendly);
+		}
 		return platforms;
 	}
 
