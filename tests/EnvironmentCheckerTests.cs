@@ -208,7 +208,7 @@ public class EnvironmentCheckerTests {
 	{
 		var result = EnvironmentChecker.MapDirectoryNamesToPlatforms (
 			new [] { "iPhoneOS", "iPhoneSimulator", "AppleTVOS", "AppleTVSimulator",
-			         "WatchOS", "WatchSimulator", "XROS", "XRSimulator", "MacOSX" });
+					 "WatchOS", "WatchSimulator", "XROS", "XRSimulator", "MacOSX" });
 		Assert.That (result, Is.EqualTo (new List<string> { "iOS", "tvOS", "watchOS", "visionOS", "macOS" }));
 	}
 
