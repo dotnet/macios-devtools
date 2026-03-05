@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Xamarin.MacDev.Models;
 
 #nullable enable
@@ -51,11 +50,19 @@ public class EnvironmentChecker {
 			log.LogInfo ("No Xcode installation found.");
 		}
 
-		var clt = new CommandLineTools (log);
-		result.CommandLineTools = clt.Check ();
+		try {
+			var clt = new CommandLineTools (log);
+			result.CommandLineTools = clt.Check ();
+		} catch (Exception ex) {
+			log.LogInfo ("Could not check Command Line Tools: {0}", ex.Message);
+		}
 
-		var runtimeService = new RuntimeService (log);
-		result.Runtimes = runtimeService.List (availableOnly: true);
+		try {
+			var runtimeService = new RuntimeService (log);
+			result.Runtimes = runtimeService.List (availableOnly: true);
+		} catch (Exception ex) {
+			log.LogInfo ("Could not check runtimes: {0}", ex.Message);
+		}
 
 		result.DeriveStatus ();
 
