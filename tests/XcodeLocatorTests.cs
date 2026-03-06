@@ -13,6 +13,7 @@ using Xamarin.MacDev;
 namespace Tests {
 
 	[TestFixture]
+	[Platform (Exclude = "Win", Reason = "Xcode is a macOS-only tool; xcode-select and Xcode bundles are not valid on Windows.")]
 	public class XcodeLocatorTests {
 
 		static string CreateFakeXcodeBundle (string version = "16.2", string dtXcode = "1620", string? cfBundleVersion = null)
@@ -97,7 +98,7 @@ namespace Tests {
 		}
 
 		[Test]
-		public void TryLocatingXcode_Override_MissingVersionPlist_ReturnsFalse ()
+		public void TryLocatingXcode_Override_MissingVersionPlist_IgnoresBrokenPath ()
 		{
 			var dir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName () + ".app");
 			var contentsDir = Path.Combine (dir, "Contents");
@@ -109,16 +110,17 @@ namespace Tests {
 ");
 			try {
 				var locator = new XcodeLocator (ConsoleLogger.Instance);
-				var found = locator.TryLocatingXcode (dir);
-				Assert.That (found, Is.False, "TryLocatingXcode should return false when version.plist is missing.");
-				Assert.That (locator.XcodeVersion, Is.EqualTo (new Version (0, 0, 0)), "XcodeVersion should remain at default.");
+				locator.TryLocatingXcode (dir);
+				// The broken path must never be accepted as the Xcode location,
+				// even if a fallback (xcode-select) finds a different valid Xcode.
+				Assert.That (locator.XcodeLocation, Is.Not.EqualTo (dir), "A bundle missing version.plist should not be set as XcodeLocation.");
 			} finally {
 				Directory.Delete (dir, recursive: true);
 			}
 		}
 
 		[Test]
-		public void TryLocatingXcode_Override_MissingInfoPlist_ReturnsFalse ()
+		public void TryLocatingXcode_Override_MissingInfoPlist_IgnoresBrokenPath ()
 		{
 			var dir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName () + ".app");
 			var contentsDir = Path.Combine (dir, "Contents");
@@ -130,9 +132,10 @@ namespace Tests {
 			// No Info.plist created.
 			try {
 				var locator = new XcodeLocator (ConsoleLogger.Instance);
-				var found = locator.TryLocatingXcode (dir);
-				Assert.That (found, Is.False, "TryLocatingXcode should return false when Info.plist is missing.");
-				Assert.That (locator.XcodeVersion, Is.EqualTo (new Version (0, 0, 0)), "XcodeVersion should remain at default.");
+				locator.TryLocatingXcode (dir);
+				// The broken path must never be accepted as the Xcode location,
+				// even if a fallback (xcode-select) finds a different valid Xcode.
+				Assert.That (locator.XcodeLocation, Is.Not.EqualTo (dir), "A bundle missing Info.plist should not be set as XcodeLocation.");
 			} finally {
 				Directory.Delete (dir, recursive: true);
 			}
