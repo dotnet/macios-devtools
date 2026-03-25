@@ -1,5 +1,4 @@
 <Project>
-
   <PropertyGroup>
     <MajorVersion>1</MajorVersion>
     <MinorVersion>0</MinorVersion>
@@ -10,11 +9,9 @@
     <!-- Set to true when stabilizing a release (removes prerelease label) -->
     <StabilizePackageVersion>false</StabilizePackageVersion>
   </PropertyGroup>
-
   <PropertyGroup>
     <!-- Dependencies managed by darc/maestro (versions flow automatically) -->
   </PropertyGroup>
-
   <PropertyGroup>
     <!-- Pinned dependencies -->
     <SystemTextJsonVersion>9.0.4</SystemTextJsonVersion>
@@ -23,5 +20,4 @@
     <NUnitConsoleRunnerVersion>3.18.1</NUnitConsoleRunnerVersion>
     <NUnit3TestAdapterVersion>5.0.0</NUnit3TestAdapterVersion>
   </PropertyGroup>
-
 </Project>
