@@ -5,3 +5,5 @@ obj
 /packages/
 .vs/
 *.nupkg
+artifacts/
+.packages/
