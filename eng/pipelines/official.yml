@@ -8,7 +8,7 @@ variables:
   - name: _TeamName
     value: macios-devtools-official
   - name: _SignType
-    value: Real
+    value: test
   - name: PostBuildSign
     value: false
 
