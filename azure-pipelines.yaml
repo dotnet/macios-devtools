@@ -41,7 +41,7 @@ stages:
         pool:
           vmImage: macOS-15
         steps:
-        - script: eng/common/build.sh --restore --build --pack --configuration $(_BuildConfig) --prepareMachine
+        - script: eng/common/build.sh --restore --build --pack --configuration $(_BuildConfig) --prepareMachine --ci
           displayName: Build
 
         - script: >-
