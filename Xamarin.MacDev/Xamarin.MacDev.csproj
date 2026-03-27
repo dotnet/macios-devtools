@@ -7,6 +7,7 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <!-- NuGet Package Properties -->
@@ -24,10 +25,6 @@
   </PropertyGroup>
 
   <!-- Output Path -->
-  <PropertyGroup>
-    <OutputPath>$(ToolOutputFullPath)</OutputPath>
-  </PropertyGroup>
-
   <!-- Trimming/AOT for non-netstandard targets -->
   <PropertyGroup Condition=" '$(TargetFramework)' != 'netstandard2.0' ">
     <IsTrimmable>true</IsTrimmable>
@@ -42,19 +39,6 @@
     <Compile Remove="NullableAttributes.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="MicroBuild.Core" Version="0.3.0">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
-    <PackageReference Include="System.Text.Json" Version="9.0.4" Condition=" '$(TargetFramework)' == 'netstandard2.0' " />
+    <PackageReference Include="System.Text.Json" Version="$(SystemTextJsonVersion)" Condition=" '$(TargetFramework)' == 'netstandard2.0' " />
   </ItemGroup>
-
-  <Target Name="GetFilesToSign" BeforeTargets="SignFiles" Condition=" '$(Configuration)' == 'Release' ">
-    <ItemGroup>
-      <FilesToSign Include="$(OutDir)\$(AssemblyName).dll">
-        <Authenticode>Microsoft400</Authenticode>
-      </FilesToSign>
-    </ItemGroup>
-  </Target>
 </Project>

@@ -1,0 +1,75 @@
+parameters:
+- name: publishPackages
+  displayName: 'Publish packages to feed'
+  type: boolean
+  default: true
+
+variables:
+  - name: _TeamName
+    value: macios-devtools-official
+  - name: _SignType
+    value: test
+  - name: PostBuildSign
+    value: false
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - main
+    - release/*
+
+pr: none
+
+resources:
+  repositories:
+  - repository: 1ESPipelineTemplates
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    pool:
+      name: NetCore1ESPool-Internal
+      image: windows.vs2022.amd64
+      os: windows
+
+    stages:
+    - stage: build
+      displayName: Build
+      jobs:
+      - template: /eng/common/templates-official/jobs/jobs.yml@self
+        parameters:
+          enableMicrobuild: true
+          enablePublishBuildAssets: true
+          enablePublishBuildArtifacts: true
+          enablePublishTestResults: true
+          enableTelemetry: true
+          jobs:
+          - job: Windows
+            pool:
+              name: NetCore1ESPool-Internal
+              demands: ImageOverride -equals windows.vs2022.amd64
+            strategy:
+              matrix:
+                Release:
+                  _BuildConfig: Release
+                  _OfficialBuildArgs: >-
+                    /p:DotNetSignType=$(_SignType)
+                    /p:TeamName=$(_TeamName)
+                    /p:OfficialBuildId=$(BUILD.BUILDNUMBER)
+            steps:
+            - script: >-
+                eng\common\cibuild.cmd
+                -configuration $(_BuildConfig)
+                -prepareMachine
+                $(_OfficialBuildArgs)
+              displayName: Build and Test
+
+    - template: /eng/common/templates-official/post-build/post-build.yml@self
+      parameters:
+        enableSourceLinkValidation: false
+        enableSigningValidation: true
+        enableNugetValidation: true
