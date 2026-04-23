@@ -31,6 +31,25 @@ public class SimCtl {
 	/// </summary>
 	public string? Run (params string [] args)
 	{
+		return RunCore (null, args);
+	}
+
+	/// <summary>
+	/// Runs <c>xcrun simctl {args}</c>, writes stdout to <paramref name="outputPath"/>,
+	/// and returns the output. Returns null on failure.
+	/// Use this instead of <see cref="Run"/> when the output is structured (e.g. JSON)
+	/// and you need to isolate it from any stdout noise.
+	/// </summary>
+	public string? RunToFile (string outputPath, params string [] args)
+	{
+		if (string.IsNullOrEmpty (outputPath))
+			throw new ArgumentException ("Output path must not be null or empty.", nameof (outputPath));
+
+		return RunCore (outputPath, args);
+	}
+
+	string? RunCore (string? outputPath, string [] args)
+	{
 		if (!File.Exists (XcrunPath)) {
 			log.LogInfo ("xcrun not found at '{0}'.", XcrunPath);
 			return null;
@@ -48,6 +67,10 @@ public class SimCtl {
 				log.LogInfo ("simctl {0} failed (exit {1}): {2}", args.Length > 0 ? args [0] : "", exitCode, stderr.Trim ());
 				return null;
 			}
+
+			if (outputPath is not null)
+				File.WriteAllText (outputPath, stdout);
+
 			return stdout;
 		} catch (System.ComponentModel.Win32Exception ex) {
 			log.LogInfo ("Could not run xcrun simctl: {0}", ex.Message);

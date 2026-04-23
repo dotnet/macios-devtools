@@ -96,17 +96,17 @@ namespace Xamarin.MacDev {
 
 		public void LogWarning (string messageFormat, params object? [] args)
 		{
-			Console.Error.WriteLine ("Warning: " + messageFormat, args);
+			Console.WriteLine ("Warning: " + messageFormat, args);
 		}
 
 		public void LogInfo (string messageFormat, params object? [] args)
 		{
-			Console.Error.WriteLine ("Info: " + messageFormat, args);
+			Console.WriteLine ("Info: " + messageFormat, args);
 		}
 
 		public void LogDebug (string messageFormat, params object? [] args)
 		{
-			Console.Error.WriteLine ("Debug: " + messageFormat, args);
+			Console.WriteLine ("Debug: " + messageFormat, args);
 		}
 	}
 

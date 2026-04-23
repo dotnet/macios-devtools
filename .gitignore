@@ -7,4 +7,3 @@ obj
 *.nupkg
 artifacts/
 .packages/
-.nuget/
