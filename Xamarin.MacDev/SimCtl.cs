@@ -42,7 +42,7 @@ public class SimCtl {
 	/// </summary>
 	public string? RunToFile (string outputPath, params string [] args)
 	{
-		if (string.IsNullOrEmpty (outputPath))
+		if (string.IsNullOrWhiteSpace (outputPath))
 			throw new ArgumentException ("Output path must not be null or empty.", nameof (outputPath));
 
 		return RunCore (outputPath, args);
@@ -68,8 +68,15 @@ public class SimCtl {
 				return null;
 			}
 
-			if (outputPath is not null)
-				File.WriteAllText (outputPath, stdout);
+			if (outputPath is not null) {
+				try {
+					File.WriteAllText (outputPath, stdout);
+				} catch (IOException ex) {
+					log.LogWarning ("Failed to write output to '{0}': {1}", outputPath, ex.Message);
+				} catch (UnauthorizedAccessException ex) {
+					log.LogWarning ("Failed to write output to '{0}': {1}", outputPath, ex.Message);
+				}
+			}
 
 			return stdout;
 		} catch (System.ComponentModel.Win32Exception ex) {
