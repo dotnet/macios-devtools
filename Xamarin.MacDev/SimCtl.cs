@@ -66,14 +66,16 @@ public class SimCtl {
 	/// </summary>
 	public string? RunJson (params string [] args)
 	{
-		var tempPath = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+		var tempPath = Path.GetTempFileName ();
 		try {
 			var jsonArgs = new string [args.Length + 2];
 			Array.Copy (args, jsonArgs, args.Length);
 			jsonArgs [args.Length] = "--json";
 			jsonArgs [args.Length + 1] = "--json-output=" + tempPath;
 
-			Run (jsonArgs);
+			var result = Run (jsonArgs);
+			if (result is null)
+				return null;
 
 			if (!File.Exists (tempPath)) {
 				log.LogInfo ("simctl did not produce JSON output file at '{0}'.", tempPath);
