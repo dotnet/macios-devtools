@@ -31,25 +31,6 @@ public class SimCtl {
 	/// </summary>
 	public string? Run (params string [] args)
 	{
-		return RunCore (null, args);
-	}
-
-	/// <summary>
-	/// Runs <c>xcrun simctl {args}</c>, writes stdout to <paramref name="outputPath"/>,
-	/// and returns the output. Returns null on failure.
-	/// Use this instead of <see cref="Run"/> when the output is structured (e.g. JSON)
-	/// and you need to isolate it from any stdout noise.
-	/// </summary>
-	public string? RunToFile (string outputPath, params string [] args)
-	{
-		if (string.IsNullOrWhiteSpace (outputPath))
-			throw new ArgumentException ("Output path must not be null or empty.", nameof (outputPath));
-
-		return RunCore (outputPath, args);
-	}
-
-	string? RunCore (string? outputPath, string [] args)
-	{
 		if (!File.Exists (XcrunPath)) {
 			log.LogInfo ("xcrun not found at '{0}'.", XcrunPath);
 			return null;
@@ -67,17 +48,6 @@ public class SimCtl {
 				log.LogInfo ("simctl {0} failed (exit {1}): {2}", args.Length > 0 ? args [0] : "", exitCode, stderr.Trim ());
 				return null;
 			}
-
-			if (outputPath is not null) {
-				try {
-					File.WriteAllText (outputPath, stdout);
-				} catch (IOException ex) {
-					log.LogWarning ("Failed to write output to '{0}': {1}", outputPath, ex.Message);
-				} catch (UnauthorizedAccessException ex) {
-					log.LogWarning ("Failed to write output to '{0}': {1}", outputPath, ex.Message);
-				}
-			}
-
 			return stdout;
 		} catch (System.ComponentModel.Win32Exception ex) {
 			log.LogInfo ("Could not run xcrun simctl: {0}", ex.Message);
@@ -85,6 +55,40 @@ public class SimCtl {
 		} catch (InvalidOperationException ex) {
 			log.LogInfo ("Could not run xcrun simctl: {0}", ex.Message);
 			return null;
+		}
+	}
+
+	/// <summary>
+	/// Runs <c>xcrun simctl {args}</c> with <c>--json --json-output=&lt;file&gt;</c>
+	/// so that structured JSON output is written to a temp file instead of stdout.
+	/// Returns the file contents, or null on failure.
+	/// This is intended for <c>simctl list</c> subcommands that support <c>--json-output</c>.
+	/// </summary>
+	public string? RunJson (params string [] args)
+	{
+		var tempPath = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+		try {
+			var jsonArgs = new string [args.Length + 2];
+			Array.Copy (args, jsonArgs, args.Length);
+			jsonArgs [args.Length] = "--json";
+			jsonArgs [args.Length + 1] = "--json-output=" + tempPath;
+
+			Run (jsonArgs);
+
+			if (!File.Exists (tempPath)) {
+				log.LogInfo ("simctl did not produce JSON output file at '{0}'.", tempPath);
+				return null;
+			}
+
+			var content = File.ReadAllText (tempPath);
+			if (string.IsNullOrWhiteSpace (content)) {
+				log.LogInfo ("simctl produced an empty JSON output file at '{0}'.", tempPath);
+				return null;
+			}
+
+			return content;
+		} finally {
+			try { if (File.Exists (tempPath)) File.Delete (tempPath); } catch { }
 		}
 	}
 }

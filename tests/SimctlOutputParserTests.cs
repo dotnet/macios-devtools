@@ -379,7 +379,7 @@ public class SimctlOutputParserTests {
 		// with no exceptions logged — per rolfbjarne review feedback
 		var logger = new TestLogger ();
 		var simctl = new SimCtl (logger);
-		var json = simctl.Run ("list", "--json");
+		var json = simctl.RunJson ("list");
 		Assert.That (json, Is.Not.Null, "simctl list --json should return output");
 
 		var devices = SimctlOutputParser.ParseDevices (json, logger);

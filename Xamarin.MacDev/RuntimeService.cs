@@ -31,7 +31,7 @@ public class RuntimeService {
 	/// </summary>
 	public List<SimulatorRuntimeInfo> List (bool availableOnly = false)
 	{
-		var json = simctl.Run ("list", "runtimes", "--json");
+		var json = simctl.RunJson ("list", "runtimes");
 		if (json is null)
 			return new List<SimulatorRuntimeInfo> ();
 

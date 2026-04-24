@@ -31,7 +31,7 @@ public class SimulatorService {
 	/// </summary>
 	public List<SimulatorDeviceInfo> List (bool availableOnly = false)
 	{
-		var json = simctl.Run ("list", "devices", "--json");
+		var json = simctl.RunJson ("list", "devices");
 		if (json is null)
 			return new List<SimulatorDeviceInfo> ();
 
