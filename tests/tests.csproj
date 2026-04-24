@@ -7,6 +7,9 @@
     <IsPackable>false</IsPackable>
     <IsShipping>false</IsShipping>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- Explicit Microsoft.NET.Test.Sdk is needed for testhost.runtimeconfig.json;
+         suppress NETSDK1023 on SDKs that implicitly reference it. -->
+    <NoWarn>$(NoWarn);NETSDK1023;NU1504</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
