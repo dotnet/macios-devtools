@@ -52,9 +52,15 @@ namespace Tests {
 
 			var dir = Path.GetDirectoryName (codeBase);
 
-			while (!string.Equals (Path.GetFileName (dir), "tests", StringComparison.Ordinal)) {
+			while (true) {
+				if (string.Equals (Path.GetFileName (dir), "tests", StringComparison.Ordinal)
+					&& File.Exists (Path.Combine (dir, "tests.csproj"))) {
+					break;
+				}
+
 				var candidate = Path.Combine (dir, "tests");
-				if (Directory.Exists (candidate)) {
+				if (Directory.Exists (candidate)
+					&& File.Exists (Path.Combine (candidate, "tests.csproj"))) {
 					dir = candidate;
 					break;
 				}
