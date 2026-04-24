@@ -18,6 +18,7 @@
     <NUnitVersion>4.1.0</NUnitVersion>
     <NUnitAnalyzersVersion>4.3.0</NUnitAnalyzersVersion>
     <NUnitConsoleRunnerVersion>3.18.1</NUnitConsoleRunnerVersion>
-    <NUnit3TestAdapterVersion>5.0.0</NUnit3TestAdapterVersion>
+    <NUnit3TestAdapterVersion>4.6.0</NUnit3TestAdapterVersion>
+    <MicrosoftNETTestSdkVersion>17.12.0</MicrosoftNETTestSdkVersion>
   </PropertyGroup>
 </Project>
