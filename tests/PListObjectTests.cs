@@ -319,6 +319,41 @@ namespace Tests {
 			}
 		}
 
+		static readonly object [] NonDictPlistCases = new object [] {
+			new object [] { "array", ArrayPlistXml, "PArray" },
+			new object [] { "string", StringPlistXml, "PString" },
+			new object [] { "integer", IntegerPlistXml, "PNumber" },
+			new object [] { "real", RealPlistXml, "PReal" },
+			new object [] { "boolean", BooleanPlistXml, "PBoolean" },
+			new object [] { "date", DatePlistXml, "PDate" },
+			new object [] { "data", DataPlistXml, "PData" },
+		};
+
+		[TestCaseSource (nameof (NonDictPlistCases))]
+		public void OpenFile_NonDictRoot_Throws (string label, string xml, string expectedTypeName)
+		{
+			var path = CreateTempPlistFile (xml);
+			try {
+				var ex = Assert.Throws<FormatException> (() => PDictionary.OpenFile (path));
+				Assert.That (ex.Message, Does.Contain ("does not contain a dictionary"));
+				Assert.That (ex.Message, Does.Contain (expectedTypeName));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[TestCaseSource (nameof (NonDictPlistCases))]
+		public void TryOpenFile_NonDictRoot_ReturnsFalse (string label, string xml, string expectedTypeName)
+		{
+			var path = CreateTempPlistFile (xml);
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
+				Assert.That (dict, Is.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
 		[Test]
 		public void FromFile_ReturnsArray ()
 		{
