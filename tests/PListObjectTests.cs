@@ -142,6 +142,146 @@ namespace Tests {
 			Assert.That (plist.TryGetStringValue ("✅", out var emojiValue), Is.True);
 			Assert.That (emojiValue, Is.EqualTo ("❌"));
 		}
+
+		string CreateTempPlistFile (string content)
+		{
+			var path = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName () + ".plist");
+			File.WriteAllText (path, content);
+			return path;
+		}
+
+		static readonly string SamplePlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<dict>
+	<key>Name</key>
+	<string>Test</string>
+</dict>
+</plist>";
+
+		static readonly string ArrayPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<array>
+	<string>A</string>
+</array>
+</plist>";
+
+		[Test]
+		public void OpenFile_ValidDictionary ()
+		{
+			var path = CreateTempPlistFile (SamplePlistXml);
+			try {
+				var dict = PDictionary.OpenFile (path);
+				Assert.That (dict, Is.Not.Null);
+				Assert.That (dict.TryGetStringValue ("Name", out var name), Is.True);
+				Assert.That (name, Is.EqualTo ("Test"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void OpenFile_ValidDictionaryWithIsBinary ()
+		{
+			var path = CreateTempPlistFile (SamplePlistXml);
+			try {
+				var dict = PDictionary.OpenFile (path, out bool isBinary);
+				Assert.That (isBinary, Is.False);
+				Assert.That (dict, Is.Not.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void OpenFile_FileNotFound ()
+		{
+			var path = Path.Combine (Path.GetTempPath (), "nonexistent-" + Path.GetRandomFileName () + ".plist");
+			Assert.Throws<FileNotFoundException> (() => PDictionary.OpenFile (path));
+		}
+
+		[Test]
+		public void OpenFile_NotADictionary ()
+		{
+			var path = CreateTempPlistFile (ArrayPlistXml);
+			try {
+				var ex = Assert.Throws<FormatException> (() => PDictionary.OpenFile (path));
+				Assert.That (ex.Message, Does.Contain ("does not contain a dictionary"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void OpenFile_InvalidContent ()
+		{
+			var path = CreateTempPlistFile ("this is not valid plist content");
+			try {
+				Assert.Throws<FormatException> (() => PDictionary.OpenFile (path));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void TryOpenFile_ValidDictionary ()
+		{
+			var path = CreateTempPlistFile (SamplePlistXml);
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.True);
+				Assert.That (dict, Is.Not.Null);
+				Assert.That (dict.TryGetStringValue ("Name", out var name), Is.True);
+				Assert.That (name, Is.EqualTo ("Test"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void TryOpenFile_ValidDictionaryWithIsBinary ()
+		{
+			var path = CreateTempPlistFile (SamplePlistXml);
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict, out bool isBinary), Is.True);
+				Assert.That (isBinary, Is.False);
+				Assert.That (dict, Is.Not.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void TryOpenFile_FileNotFound ()
+		{
+			var path = Path.Combine (Path.GetTempPath (), "nonexistent-" + Path.GetRandomFileName () + ".plist");
+			Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
+			Assert.That (dict, Is.Null);
+		}
+
+		[Test]
+		public void TryOpenFile_NotADictionary ()
+		{
+			var path = CreateTempPlistFile (ArrayPlistXml);
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
+				Assert.That (dict, Is.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void TryOpenFile_InvalidContent ()
+		{
+			var path = CreateTempPlistFile ("this is not valid plist content");
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
+				Assert.That (dict, Is.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
 	}
 }
 

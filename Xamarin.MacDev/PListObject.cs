@@ -769,6 +769,57 @@ namespace Xamarin.MacDev {
 			return (PDictionary?) PObject.FromFile (fileName, out isBinary);
 		}
 
+		/// <summary>
+		/// Opens a plist file and returns a PDictionary.
+		/// Throws if the file does not exist, cannot be parsed, or does not contain a dictionary.
+		/// </summary>
+		public static PDictionary OpenFile (string fileName)
+		{
+			return OpenFile (fileName, out _);
+		}
+
+		/// <summary>
+		/// Opens a plist file and returns a PDictionary.
+		/// Throws if the file does not exist, cannot be parsed, or does not contain a dictionary.
+		/// </summary>
+		public static PDictionary OpenFile (string fileName, out bool isBinary)
+		{
+			var result = PObject.FromFile (fileName, out isBinary);
+			if (result is PDictionary dict)
+				return dict;
+			throw new FormatException ($"The plist file '{fileName}' does not contain a dictionary (got {result?.GetType ().Name ?? "null"}).");
+		}
+
+		/// <summary>
+		/// Tries to open a plist file as a PDictionary.
+		/// Returns false if the file does not exist, cannot be parsed, or does not contain a dictionary.
+		/// </summary>
+		public static bool TryOpenFile (string fileName, [NotNullWhen (true)] out PDictionary? result)
+		{
+			return TryOpenFile (fileName, out result, out _);
+		}
+
+		/// <summary>
+		/// Tries to open a plist file as a PDictionary.
+		/// Returns false if the file does not exist, cannot be parsed, or does not contain a dictionary.
+		/// </summary>
+		public static bool TryOpenFile (string fileName, [NotNullWhen (true)] out PDictionary? result, out bool isBinary)
+		{
+			result = null;
+			isBinary = false;
+
+			try {
+				var obj = PObject.FromFile (fileName, out isBinary);
+				if (obj is PDictionary dict) {
+					result = dict;
+					return true;
+				}
+				return false;
+			} catch {
+				return false;
+			}
+		}
+
 		public static PDictionary? FromBinaryXml (string fileName)
 		{
 			return FromBinaryXml (File.ReadAllBytes (fileName));
@@ -1919,7 +1970,7 @@ namespace Xamarin.MacDev {
 					try {
 						CurrentType = (PlistType) Enum.Parse (typeof (PlistType), reader!.LocalName);
 					} catch (Exception ex) {
-						throw new ArgumentException (string.Format ("Failed to parse PList data type: {0}", reader?.LocalName), ex);
+						throw new FormatException (string.Format ("Failed to parse PList data type: {0}", reader?.LocalName), ex);
 					}
 				}
 
