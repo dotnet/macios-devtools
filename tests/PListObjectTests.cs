@@ -167,6 +167,42 @@ namespace Tests {
 </array>
 </plist>";
 
+		static readonly string StringPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<string>hello world</string>
+</plist>";
+
+		static readonly string IntegerPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<integer>42</integer>
+</plist>";
+
+		static readonly string RealPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<real>3.14</real>
+</plist>";
+
+		static readonly string BooleanPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<true/>
+</plist>";
+
+		static readonly string DatePlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<date>2024-01-15T10:30:00Z</date>
+</plist>";
+
+		static readonly string DataPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<data>AQID</data>
+</plist>";
+
 		[Test]
 		public void OpenFile_ValidDictionary ()
 		{
@@ -278,6 +314,99 @@ namespace Tests {
 			try {
 				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
 				Assert.That (dict, Is.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsArray ()
+		{
+			var path = CreateTempPlistFile (ArrayPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PArray> ());
+				var array = (PArray) obj!;
+				Assert.That (array.Count, Is.EqualTo (1));
+				Assert.That (((PString) array [0]).Value, Is.EqualTo ("A"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsString ()
+		{
+			var path = CreateTempPlistFile (StringPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PString> ());
+				Assert.That (((PString) obj!).Value, Is.EqualTo ("hello world"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsInteger ()
+		{
+			var path = CreateTempPlistFile (IntegerPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PNumber> ());
+				Assert.That (((PNumber) obj!).Value, Is.EqualTo (42));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsReal ()
+		{
+			var path = CreateTempPlistFile (RealPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PReal> ());
+				Assert.That (((PReal) obj!).Value, Is.EqualTo (3.14));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsBoolean ()
+		{
+			var path = CreateTempPlistFile (BooleanPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PBoolean> ());
+				Assert.That (((PBoolean) obj!).Value, Is.True);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsDate ()
+		{
+			var path = CreateTempPlistFile (DatePlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PDate> ());
+				Assert.That (((PDate) obj!).Value, Is.EqualTo (new DateTime (2024, 1, 15, 10, 30, 0, DateTimeKind.Utc)));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsData ()
+		{
+			var path = CreateTempPlistFile (DataPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PData> ());
+				Assert.That (((PData) obj!).Value, Is.EqualTo (new byte [] { 1, 2, 3 }));
 			} finally {
 				File.Delete (path);
 			}
