@@ -52,15 +52,9 @@ namespace Tests {
 
 			var dir = Path.GetDirectoryName (codeBase);
 
-			while (true) {
-				if (string.Equals (Path.GetFileName (dir), "tests", StringComparison.Ordinal)
-					&& File.Exists (Path.Combine (dir, "tests.csproj"))) {
-					break;
-				}
-
+			while (!IsTestsProjectDir (dir)) {
 				var candidate = Path.Combine (dir, "tests");
-				if (Directory.Exists (candidate)
-					&& File.Exists (Path.Combine (candidate, "tests.csproj"))) {
+				if (Directory.Exists (candidate) && IsTestsProjectDir (candidate)) {
 					dir = candidate;
 					break;
 				}
@@ -73,6 +67,12 @@ namespace Tests {
 			}
 
 			ProjectDir = Path.GetFullPath (dir);
+		}
+
+		static bool IsTestsProjectDir (string dir)
+		{
+			return string.Equals (Path.GetFileName (dir), "tests", StringComparison.Ordinal)
+				&& File.Exists (Path.Combine (dir, "tests.csproj"));
 		}
 	}
 }
