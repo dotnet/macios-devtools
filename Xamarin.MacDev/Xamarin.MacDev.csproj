@@ -39,6 +39,6 @@
     <Compile Remove="NullableAttributes.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="$(SystemTextJsonVersion)" Condition=" '$(TargetFramework)' == 'netstandard2.0' " />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" Condition=" '$(TargetFramework)' == 'netstandard2.0' " />
   </ItemGroup>
 </Project>
