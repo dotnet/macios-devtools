@@ -118,7 +118,11 @@ public partial class SimulatorService {
 				File.WriteAllText (tempPath, payloadJsonOrPath, Encoding.UTF8);
 				return RunPush (udidOrName, bundleIdentifier, tempPath);
 			} finally {
-				try { if (File.Exists (tempPath)) File.Delete (tempPath); } catch { }
+				try { if (File.Exists (tempPath)) File.Delete (tempPath); } catch (IOException ex) {
+					log.LogInfo ("Failed to delete temporary push payload file '{0}': {1}", tempPath, ex.Message);
+				} catch (UnauthorizedAccessException ex) {
+					log.LogInfo ("Failed to delete temporary push payload file '{0}': {1}", tempPath, ex.Message);
+				}
 			}
 		}
 

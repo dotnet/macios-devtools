@@ -149,11 +149,11 @@ public class SimulatorScreenCapture {
 				sb.Append (' ');
 
 			var arg = arguments [i];
-			if (arg.Length > 0 && arg.IndexOfAny (new [] { ' ', '\t', '"' }) < 0) {
+			if (arg.Length > 0 && arg.IndexOfAny (new [] { ' ', '\t', '"', '\\' }) < 0) {
 				sb.Append (arg);
 			} else {
 				sb.Append ('"');
-				sb.Append (arg.Replace ("\"", "\\\""));
+				sb.Append (arg.Replace ("\\", "\\\\").Replace ("\"", "\\\""));
 				sb.Append ('"');
 			}
 		}
