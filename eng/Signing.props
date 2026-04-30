@@ -1,0 +1,18 @@
+<Project>
+  <!--
+    Signing configuration for ESRP/MicroBuild package signing.
+
+    Certificate types:
+    - UseDotNetCertificate: Default Microsoft .NET certificate for first-party assemblies
+    - 3PartySHA2: For redistributed third-party assemblies
+    - NuGet: For NuGet package signing (.nupkg files)
+    - None: For files that should not be signed
+  -->
+  <PropertyGroup>
+    <UseDotNetCertificate>true</UseDotNetCertificate>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FileExtensionSignInfo Update=".nupkg" CertificateName="NuGet" />
+  </ItemGroup>
+</Project>

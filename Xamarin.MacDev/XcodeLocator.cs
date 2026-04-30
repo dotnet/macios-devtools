@@ -125,7 +125,7 @@ namespace Xamarin.MacDev {
 			}
 
 			// 3. Not optional
-			if (TryGetSystemXcode (log, out location)) {
+			if (TryGetSystemXcode (log, out var systemXcodePath) && TryLocatingSpecificXcode (systemXcodePath, out location)) {
 				log.LogInfo ($"Found a valid Xcode from the system settings ('xcode-select -p').");
 				XcodeLocation = location;
 				return true;

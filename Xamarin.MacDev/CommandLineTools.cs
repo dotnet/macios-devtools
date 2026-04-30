@@ -81,6 +81,8 @@ namespace Xamarin.MacDev {
 					}
 				} catch (System.ComponentModel.Win32Exception ex) {
 					log.LogInfo ("Could not run xcode-select: {0}", ex.Message);
+				} catch (InvalidOperationException ex) {
+					log.LogInfo ("Could not run xcode-select: {0}", ex.Message);
 				}
 			}
 
@@ -107,6 +109,9 @@ namespace Xamarin.MacDev {
 
 				return ParsePkgutilVersion (stdout);
 			} catch (System.ComponentModel.Win32Exception ex) {
+				log.LogInfo ("Could not run pkgutil: {0}", ex.Message);
+				return null;
+			} catch (InvalidOperationException ex) {
 				log.LogInfo ("Could not run pkgutil: {0}", ex.Message);
 				return null;
 			}

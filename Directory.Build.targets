@@ -1,0 +1,21 @@
+<Project>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.DotNet.Arcade.Sdk" />
+
+  <!-- Workaround for dotnet/arcade#16611: WiX 5 tools path missing platform subdirectories.
+       Remove once the upstream fix is available. -->
+  <Target Name="CreateWixToolsPathWorkaround"
+          BeforeTargets="Build"
+          Condition="Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)')">
+    <MakeDir Directories="$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\x64"
+             Condition="!Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\x64')" />
+    <MakeDir Directories="$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\arm64"
+             Condition="!Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\arm64')" />
+  </Target>
+
+  <Import
+      Project="$([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory))).override.targets"
+      Condition=" Exists('$([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory))).override.targets') "
+  />
+
+</Project>

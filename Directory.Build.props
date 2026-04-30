@@ -1,13 +1,21 @@
 <Project>
-	<PropertyGroup>
-		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-		<RepositoryUrl>https://github.com/dotnet/macios-devtools</RepositoryUrl>
-		<RepositoryType>git</RepositoryType>
-	</PropertyGroup>
 
-	<PropertyGroup>
-		<BaseOutputPath>$(MSBuildThisFileDirectory)bin\</BaseOutputPath>
-		<ToolOutputFullPath>$(BaseOutputPath)$(Configuration)\</ToolOutputFullPath>
-		<TestOutputFullPath>$(BaseOutputPath)Test$(Configuration)\</TestOutputFullPath>
-	</PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.DotNet.Arcade.Sdk" />
+
+  <PropertyGroup>
+    <Copyright>$(CopyrightNetFoundation)</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/dotnet/macios-devtools</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dotnet/macios-devtools</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <LangVersion>latest</LangVersion>
+    <!-- Set to true for packages that ship publicly on NuGet.org -->
+    <IsShipping>true</IsShipping>
+    <!-- Suppress NU1507: official builds inject internal feeds not covered by packageSourceMapping -->
+    <NoWarn>$(NoWarn);NU1507</NoWarn>
+  </PropertyGroup>
+
 </Project>

@@ -1,0 +1,5 @@
+# 1ES Pipeline Template auto-baselining configuration.
+# Pipeline IDs will be populated automatically once pipelines are registered in Azure DevOps.
+#
+# See 1ES Pipeline Templates SDL analysis documentation for details.
+pipelines: {}

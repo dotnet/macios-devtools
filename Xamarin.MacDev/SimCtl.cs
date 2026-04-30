@@ -57,4 +57,40 @@ public class SimCtl {
 			return null;
 		}
 	}
+
+	/// <summary>
+	/// Runs <c>xcrun simctl {args}</c> with <c>--json --json-output=&lt;file&gt;</c>
+	/// so that structured JSON output is written to a temp file instead of stdout.
+	/// Returns the file contents, or null on failure.
+	/// This is intended for <c>simctl list</c> subcommands that support <c>--json-output</c>.
+	/// </summary>
+	public string? RunJson (params string [] args)
+	{
+		var tempPath = Path.GetTempFileName ();
+		try {
+			var jsonArgs = new string [args.Length + 2];
+			Array.Copy (args, jsonArgs, args.Length);
+			jsonArgs [args.Length] = "--json";
+			jsonArgs [args.Length + 1] = "--json-output=" + tempPath;
+
+			var result = Run (jsonArgs);
+			if (result is null)
+				return null;
+
+			if (!File.Exists (tempPath)) {
+				log.LogInfo ("simctl did not produce JSON output file at '{0}'.", tempPath);
+				return null;
+			}
+
+			var content = File.ReadAllText (tempPath);
+			if (string.IsNullOrWhiteSpace (content)) {
+				log.LogInfo ("simctl produced an empty JSON output file at '{0}'.", tempPath);
+				return null;
+			}
+
+			return content;
+		} finally {
+			try { if (File.Exists (tempPath)) File.Delete (tempPath); } catch { }
+		}
+	}
 }
