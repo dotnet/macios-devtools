@@ -42,3 +42,11 @@ namespace System.Diagnostics.CodeAnalysis {
 	}
 }
 #endif // !NET
+
+#if NETSTANDARD2_0
+namespace System.Runtime.CompilerServices {
+	// Required polyfill for C# 9 records on netstandard2.0 targets.
+	// See: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-9.0/records
+	internal static class IsExternalInit { }
+}
+#endif // NETSTANDARD2_0

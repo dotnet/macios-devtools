@@ -16,7 +16,7 @@ namespace Xamarin.MacDev;
 /// </summary>
 public class SimCtl {
 
-	static readonly string XcrunPath = "/usr/bin/xcrun";
+	internal static readonly string XcrunPath = "/usr/bin/xcrun";
 
 	readonly ICustomLogger log;
 
