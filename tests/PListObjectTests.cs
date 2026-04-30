@@ -142,6 +142,310 @@ namespace Tests {
 			Assert.That (plist.TryGetStringValue ("✅", out var emojiValue), Is.True);
 			Assert.That (emojiValue, Is.EqualTo ("❌"));
 		}
+
+		string CreateTempPlistFile (string content)
+		{
+			var path = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName () + ".plist");
+			File.WriteAllText (path, content);
+			return path;
+		}
+
+		static readonly string SamplePlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<dict>
+	<key>Name</key>
+	<string>Test</string>
+</dict>
+</plist>";
+
+		static readonly string ArrayPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<array>
+	<string>A</string>
+</array>
+</plist>";
+
+		static readonly string StringPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<string>hello world</string>
+</plist>";
+
+		static readonly string IntegerPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<integer>42</integer>
+</plist>";
+
+		static readonly string RealPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<real>3.14</real>
+</plist>";
+
+		static readonly string BooleanPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<true/>
+</plist>";
+
+		static readonly string DatePlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<date>2024-01-15T10:30:00Z</date>
+</plist>";
+
+		static readonly string DataPlistXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<data>AQID</data>
+</plist>";
+
+		[Test]
+		public void OpenFile_ValidDictionary ()
+		{
+			var path = CreateTempPlistFile (SamplePlistXml);
+			try {
+				var dict = PDictionary.OpenFile (path);
+				Assert.That (dict, Is.Not.Null);
+				Assert.That (dict.TryGetStringValue ("Name", out var name), Is.True);
+				Assert.That (name, Is.EqualTo ("Test"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void OpenFile_ValidDictionaryWithIsBinary ()
+		{
+			var path = CreateTempPlistFile (SamplePlistXml);
+			try {
+				var dict = PDictionary.OpenFile (path, out bool isBinary);
+				Assert.That (isBinary, Is.False);
+				Assert.That (dict, Is.Not.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void OpenFile_FileNotFound ()
+		{
+			var path = Path.Combine (Path.GetTempPath (), "nonexistent-" + Path.GetRandomFileName () + ".plist");
+			Assert.Throws<FileNotFoundException> (() => PDictionary.OpenFile (path));
+		}
+
+		[Test]
+		public void OpenFile_NotADictionary ()
+		{
+			var path = CreateTempPlistFile (ArrayPlistXml);
+			try {
+				var ex = Assert.Throws<FormatException> (() => PDictionary.OpenFile (path));
+				Assert.That (ex.Message, Does.Contain ("does not contain a dictionary"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void OpenFile_InvalidContent ()
+		{
+			var path = CreateTempPlistFile ("this is not valid plist content");
+			try {
+				Assert.Throws<FormatException> (() => PDictionary.OpenFile (path));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void TryOpenFile_ValidDictionary ()
+		{
+			var path = CreateTempPlistFile (SamplePlistXml);
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.True);
+				Assert.That (dict, Is.Not.Null);
+				Assert.That (dict.TryGetStringValue ("Name", out var name), Is.True);
+				Assert.That (name, Is.EqualTo ("Test"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void TryOpenFile_ValidDictionaryWithIsBinary ()
+		{
+			var path = CreateTempPlistFile (SamplePlistXml);
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict, out bool isBinary), Is.True);
+				Assert.That (isBinary, Is.False);
+				Assert.That (dict, Is.Not.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void TryOpenFile_FileNotFound ()
+		{
+			var path = Path.Combine (Path.GetTempPath (), "nonexistent-" + Path.GetRandomFileName () + ".plist");
+			Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
+			Assert.That (dict, Is.Null);
+		}
+
+		[Test]
+		public void TryOpenFile_NotADictionary ()
+		{
+			var path = CreateTempPlistFile (ArrayPlistXml);
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
+				Assert.That (dict, Is.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void TryOpenFile_InvalidContent ()
+		{
+			var path = CreateTempPlistFile ("this is not valid plist content");
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
+				Assert.That (dict, Is.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		static readonly object [] NonDictPlistCases = new object [] {
+			new object [] { "array", ArrayPlistXml, "PArray" },
+			new object [] { "string", StringPlistXml, "PString" },
+			new object [] { "integer", IntegerPlistXml, "PNumber" },
+			new object [] { "real", RealPlistXml, "PReal" },
+			new object [] { "boolean", BooleanPlistXml, "PBoolean" },
+			new object [] { "date", DatePlistXml, "PDate" },
+			new object [] { "data", DataPlistXml, "PData" },
+		};
+
+		[TestCaseSource (nameof (NonDictPlistCases))]
+		public void OpenFile_NonDictRoot_Throws (string label, string xml, string expectedTypeName)
+		{
+			var path = CreateTempPlistFile (xml);
+			try {
+				var ex = Assert.Throws<FormatException> (() => PDictionary.OpenFile (path));
+				Assert.That (ex.Message, Does.Contain ("does not contain a dictionary"));
+				Assert.That (ex.Message, Does.Contain (expectedTypeName));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[TestCaseSource (nameof (NonDictPlistCases))]
+		public void TryOpenFile_NonDictRoot_ReturnsFalse (string label, string xml, string expectedTypeName)
+		{
+			var path = CreateTempPlistFile (xml);
+			try {
+				Assert.That (PDictionary.TryOpenFile (path, out var dict), Is.False);
+				Assert.That (dict, Is.Null);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsArray ()
+		{
+			var path = CreateTempPlistFile (ArrayPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PArray> ());
+				var array = (PArray) obj!;
+				Assert.That (array.Count, Is.EqualTo (1));
+				Assert.That (((PString) array [0]).Value, Is.EqualTo ("A"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsString ()
+		{
+			var path = CreateTempPlistFile (StringPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PString> ());
+				Assert.That (((PString) obj!).Value, Is.EqualTo ("hello world"));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsInteger ()
+		{
+			var path = CreateTempPlistFile (IntegerPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PNumber> ());
+				Assert.That (((PNumber) obj!).Value, Is.EqualTo (42));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsReal ()
+		{
+			var path = CreateTempPlistFile (RealPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PReal> ());
+				Assert.That (((PReal) obj!).Value, Is.EqualTo (3.14));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsBoolean ()
+		{
+			var path = CreateTempPlistFile (BooleanPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PBoolean> ());
+				Assert.That (((PBoolean) obj!).Value, Is.True);
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsDate ()
+		{
+			var path = CreateTempPlistFile (DatePlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PDate> ());
+				Assert.That (((PDate) obj!).Value, Is.EqualTo (new DateTime (2024, 1, 15, 10, 30, 0, DateTimeKind.Utc)));
+			} finally {
+				File.Delete (path);
+			}
+		}
+
+		[Test]
+		public void FromFile_ReturnsData ()
+		{
+			var path = CreateTempPlistFile (DataPlistXml);
+			try {
+				var obj = PObject.FromFile (path, out bool isBinary);
+				Assert.That (obj, Is.InstanceOf<PData> ());
+				Assert.That (((PData) obj!).Value, Is.EqualTo (new byte [] { 1, 2, 3 }));
+			} finally {
+				File.Delete (path);
+			}
+		}
 	}
 }
 
