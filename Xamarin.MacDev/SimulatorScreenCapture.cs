@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
 #nullable enable
 
@@ -89,7 +90,11 @@ public class SimulatorScreenCapture {
 
 		try {
 			var process = new Process { StartInfo = psi };
+			process.OutputDataReceived += (_, _) => { };
+			process.ErrorDataReceived += (_, _) => { };
 			process.Start ();
+			process.BeginOutputReadLine ();
+			process.BeginErrorReadLine ();
 			log.LogInfo ("simctl io recordVideo started for '{0}'.", udidOrName);
 			return new VideoRecordingSession (process, log);
 		} catch (System.ComponentModel.Win32Exception ex) {
@@ -167,6 +172,8 @@ public class SimulatorScreenCapture {
 	/// </summary>
 	sealed class VideoRecordingSession : IDisposable {
 
+		const int SIGINT = 2;
+
 		readonly Process process;
 		readonly ICustomLogger log;
 		bool disposed;
@@ -186,8 +193,13 @@ public class SimulatorScreenCapture {
 
 			try {
 				if (!process.HasExited) {
-					process.Kill ();
-					process.WaitForExit (5000);
+					// Send SIGINT for graceful shutdown so simctl can flush and write
+					// the video file trailer. Using Kill() sends SIGKILL, which
+					// terminates immediately and produces a corrupt output file.
+					if (kill (process.Id, SIGINT) != 0 || !process.WaitForExit (5000)) {
+						process.Kill ();
+						process.WaitForExit (5000);
+					}
 					log.LogInfo ("simctl io recordVideo process stopped.");
 				}
 			} catch (InvalidOperationException) {
@@ -198,5 +210,8 @@ public class SimulatorScreenCapture {
 				process.Dispose ();
 			}
 		}
+
+		[DllImport ("/usr/lib/libc.dylib", SetLastError = true)]
+		static extern int kill (int pid, int sig);
 	}
 }

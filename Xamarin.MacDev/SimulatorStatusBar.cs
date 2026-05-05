@@ -74,6 +74,12 @@ public class SimulatorStatusBar {
 		if (overrides is null)
 			throw new ArgumentNullException (nameof (overrides));
 
+		if (overrides.Time is null && !overrides.BatteryLevel.HasValue &&
+			!overrides.BatteryState.HasValue && !overrides.DataNetwork.HasValue &&
+			!overrides.CellularBars.HasValue && !overrides.WifiBars.HasValue &&
+			overrides.OperatorName is null)
+			throw new ArgumentException ("At least one StatusBarOverrides field must be set.", nameof (overrides));
+
 		var args = BuildOverrideArgs (udidOrName, overrides);
 		var result = simctl.Run (args);
 		var success = result is not null;

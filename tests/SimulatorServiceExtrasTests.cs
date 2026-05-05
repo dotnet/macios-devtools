@@ -36,7 +36,8 @@ public class SimulatorServiceExtrasTests {
 	public void Privacy_ReturnsSameInstance ()
 	{
 		var svc = new SimulatorService (ConsoleLogger.Instance);
-		Assert.That (svc.Privacy, Is.SameAs (svc.Privacy));
+		var first = svc.Privacy;
+		Assert.That (first, Is.SameAs (svc.Privacy));
 	}
 
 	[Test]
@@ -95,7 +96,8 @@ public class SimulatorServiceExtrasTests {
 	public void StatusBar_ReturnsSameInstance ()
 	{
 		var svc = new SimulatorService (ConsoleLogger.Instance);
-		Assert.That (svc.StatusBar, Is.SameAs (svc.StatusBar));
+		var first = svc.StatusBar;
+		Assert.That (first, Is.SameAs (svc.StatusBar));
 	}
 
 	[Test]
@@ -112,6 +114,13 @@ public class SimulatorServiceExtrasTests {
 	{
 		var sb = new SimulatorService (ConsoleLogger.Instance).StatusBar;
 		Assert.Throws<ArgumentNullException> (() => sb.Override ("booted", null!));
+	}
+
+	[Test]
+	public void StatusBar_Override_ThrowsOnEmptyOverrides ()
+	{
+		var sb = new SimulatorService (ConsoleLogger.Instance).StatusBar;
+		Assert.Throws<ArgumentException> (() => sb.Override ("booted", new StatusBarOverrides ()));
 	}
 
 	[Test]
@@ -158,7 +167,8 @@ public class SimulatorServiceExtrasTests {
 	public void Location_ReturnsSameInstance ()
 	{
 		var svc = new SimulatorService (ConsoleLogger.Instance);
-		Assert.That (svc.Location, Is.SameAs (svc.Location));
+		var first = svc.Location;
+		Assert.That (first, Is.SameAs (svc.Location));
 	}
 
 	[Test]
@@ -200,7 +210,8 @@ public class SimulatorServiceExtrasTests {
 	public void ScreenCapture_ReturnsSameInstance ()
 	{
 		var svc = new SimulatorService (ConsoleLogger.Instance);
-		Assert.That (svc.ScreenCapture, Is.SameAs (svc.ScreenCapture));
+		var first = svc.ScreenCapture;
+		Assert.That (first, Is.SameAs (svc.ScreenCapture));
 	}
 
 	[Test]

@@ -113,7 +113,7 @@ public partial class SimulatorService {
 
 		var isInlineJson = payloadJsonOrPath.TrimStart ().StartsWith ("{", StringComparison.Ordinal);
 		if (isInlineJson) {
-			var tempPath = Path.GetTempFileName ();
+			var tempPath = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName () + ".json");
 			try {
 				File.WriteAllText (tempPath, payloadJsonOrPath, Encoding.UTF8);
 				return RunPush (udidOrName, bundleIdentifier, tempPath);
