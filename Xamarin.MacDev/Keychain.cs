@@ -429,16 +429,17 @@ namespace Xamarin.MacDev {
 			}
 
 			uint bufferLength = 1024;
-			var pathBuffer = Marshal.AllocHGlobal ((int) bufferLength);
-			var status = SecKeychainGetPath (keychainPtr, out bufferLength, pathBuffer);
+			var pathBuffer = new byte [bufferLength];
+			OSStatus status;
+			unsafe {
+				fixed (byte* pathPtr = pathBuffer)
+					status = SecKeychainGetPath (keychainPtr, out bufferLength, (IntPtr) pathPtr);
+			}
 
 			if (status != OSStatus.Ok)
 				throw new Exception ($"Could not get keychain's path {GetError (status)}");
 
-			var path = Marshal.PtrToStringAuto (pathBuffer);
-			Marshal.FreeHGlobal (pathBuffer);
-
-			return path;
+			return Encoding.UTF8.GetString (pathBuffer, 0, (int) bufferLength);
 		}
 
 		public IList<AppleCodeSigningIdentity> GetAllSigningIdentities ()
