@@ -28,6 +28,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 // Disable until we get around to enable + fix any issues.
 #nullable disable
@@ -141,6 +142,10 @@ namespace Xamarin.MacDev {
 				SettingsPath = path;
 				break;
 			}
+
+			// If no existing settings file was found, default to the first candidate path.
+			if (SettingsPath is null)
+				SettingsPath = XcodeLocator.SettingsPathCandidates.First ();
 
 			Directory.CreateDirectory (Path.GetDirectoryName (SettingsPath));
 
