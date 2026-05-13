@@ -57,7 +57,7 @@ public class SimulatorPrivacy {
 		var service = ToSimctlServiceName (permission);
 
 		string? result;
-		if (!string.IsNullOrEmpty (bundleIdentifier))
+		if (!string.IsNullOrWhiteSpace (bundleIdentifier))
 			result = simctl.Run ("privacy", udidOrName, action, service, bundleIdentifier!);
 		else
 			result = simctl.Run ("privacy", udidOrName, action, service);

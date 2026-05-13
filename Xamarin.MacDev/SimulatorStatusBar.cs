@@ -151,9 +151,9 @@ public class SimulatorStatusBar {
 	public static string ToSimctlBatteryState (SimulatorBatteryState state)
 	{
 		return state switch {
-			SimulatorBatteryState.Charging => "Charging",
-			SimulatorBatteryState.Charged => "Charged",
-			SimulatorBatteryState.Discharging => "Discharging",
+			SimulatorBatteryState.Charging => "charging",
+			SimulatorBatteryState.Charged => "charged",
+			SimulatorBatteryState.Discharging => "discharging",
 			_ => throw new ArgumentOutOfRangeException (nameof (state), state, null),
 		};
 	}

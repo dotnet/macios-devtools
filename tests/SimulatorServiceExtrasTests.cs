@@ -134,9 +134,9 @@ public class SimulatorServiceExtrasTests {
 	[Test]
 	public void StatusBar_BatteryState_ConvertsAllValues ()
 	{
-		Assert.That (SimulatorStatusBar.ToSimctlBatteryState (SimulatorBatteryState.Charging), Is.EqualTo ("Charging"));
-		Assert.That (SimulatorStatusBar.ToSimctlBatteryState (SimulatorBatteryState.Charged), Is.EqualTo ("Charged"));
-		Assert.That (SimulatorStatusBar.ToSimctlBatteryState (SimulatorBatteryState.Discharging), Is.EqualTo ("Discharging"));
+		Assert.That (SimulatorStatusBar.ToSimctlBatteryState (SimulatorBatteryState.Charging), Is.EqualTo ("charging"));
+		Assert.That (SimulatorStatusBar.ToSimctlBatteryState (SimulatorBatteryState.Charged), Is.EqualTo ("charged"));
+		Assert.That (SimulatorStatusBar.ToSimctlBatteryState (SimulatorBatteryState.Discharging), Is.EqualTo ("discharging"));
 	}
 
 	[Test]

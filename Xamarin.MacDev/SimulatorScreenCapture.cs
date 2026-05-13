@@ -77,7 +77,7 @@ public class SimulatorScreenCapture {
 		var psi = new ProcessStartInfo (SimCtl.XcrunPath) {
 			CreateNoWindow = true,
 			UseShellExecute = false,
-			RedirectStandardOutput = true,
+			RedirectStandardOutput = false,
 			RedirectStandardError = true,
 		};
 
@@ -88,20 +88,24 @@ public class SimulatorScreenCapture {
 			psi.ArgumentList.Add (arg);
 #endif
 
+		Process? process = null;
 		try {
-			var process = new Process { StartInfo = psi };
-			process.OutputDataReceived += (_, _) => { };
-			process.ErrorDataReceived += (_, _) => { };
+			process = new Process { StartInfo = psi };
+			process.ErrorDataReceived += (_, e) => {
+				if (e.Data is not null)
+					log.LogInfo ("simctl io recordVideo stderr: {0}", e.Data);
+			};
 			process.Start ();
-			process.BeginOutputReadLine ();
 			process.BeginErrorReadLine ();
 			log.LogInfo ("simctl io recordVideo started for '{0}'.", udidOrName);
 			return new VideoRecordingSession (process, log);
 		} catch (System.ComponentModel.Win32Exception ex) {
 			log.LogInfo ("Could not start xcrun simctl io recordVideo: {0}", ex.Message);
+			process?.Dispose ();
 			return null;
 		} catch (InvalidOperationException ex) {
 			log.LogInfo ("Could not start xcrun simctl io recordVideo: {0}", ex.Message);
+			process?.Dispose ();
 			return null;
 		}
 	}
