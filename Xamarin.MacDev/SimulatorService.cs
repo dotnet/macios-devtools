@@ -15,7 +15,7 @@ namespace Xamarin.MacDev;
 /// Operation patterns validated against Redth/AppleDev.Tools SimCtl and
 /// ClientTools.Platform RemoteSimulatorValidator.
 /// </summary>
-public class SimulatorService {
+public partial class SimulatorService {
 
 	readonly ICustomLogger log;
 	readonly SimCtl simctl;
