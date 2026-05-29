@@ -237,7 +237,7 @@ namespace Xamarin.MacDev {
 				family = AppleDeviceFamily.MacCatalystOptimizedForMac;
 				return true;
 			default:
-				LoggingService.LogWarning ($"Skipped unknown device family: {number.Value}");
+				LoggingService.LogWarning ($"Ignoring unrecognized device family number: {number.Value}");
 				family = default;
 				return false;
 			}
