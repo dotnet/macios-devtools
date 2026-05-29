@@ -3,7 +3,6 @@
 
 #nullable enable
 
-using System;
 using System.IO;
 using NUnit.Framework;
 using Xamarin.MacDev;
@@ -73,6 +72,34 @@ namespace tests {
 			// /etc/hosts is a file, so /etc/hosts/bogus triggers ENOTDIR
 			var path = Path.Combine ("/etc/hosts", "bogus");
 			Assert.That (PathUtils.IsSymlink (path), Is.False);
+		}
+
+		[Test]
+		[Platform ("MacOsX")]
+		public void IsSymlinkOrHasParentSymlink_ReturnsTrue_WhenParentIsSymlink ()
+		{
+			var realDir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			Directory.CreateDirectory (realDir);
+			var childDir = Path.Combine (realDir, "subdir");
+			Directory.CreateDirectory (childDir);
+
+			var linkDir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+#if NET
+				Directory.CreateSymbolicLink (linkDir, realDir);
+#else
+				var psi = new System.Diagnostics.ProcessStartInfo ("ln", $"-s \"{realDir}\" \"{linkDir}\"") {
+					UseShellExecute = false,
+				};
+				System.Diagnostics.Process.Start (psi)!.WaitForExit ();
+#endif
+				var childViaLink = Path.Combine (linkDir, "subdir");
+				Assert.That (PathUtils.IsSymlinkOrHasParentSymlink (childViaLink), Is.True);
+			} finally {
+				if (Directory.Exists (linkDir))
+					Directory.Delete (linkDir);
+				Directory.Delete (realDir, recursive: true);
+			}
 		}
 	}
 }
