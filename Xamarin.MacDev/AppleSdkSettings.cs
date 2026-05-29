@@ -194,7 +194,10 @@ namespace Xamarin.MacDev {
 				XcodePath = xcode;
 				DeveloperRoot = devroot;
 				DeveloperRootVersionPlist = vplist;
-				Environment.SetEnvironmentVariable ("XCODE_DEVELOPER_DIR_PATH", DeveloperRoot);
+				if (!string.IsNullOrEmpty (DeveloperRoot))
+					Environment.SetEnvironmentVariable ("XCODE_DEVELOPER_DIR_PATH", DeveloperRoot);
+				else
+					Environment.SetEnvironmentVariable ("XCODE_DEVELOPER_DIR_PATH", null);
 			} else {
 				SetInvalid ();
 				return;
