@@ -812,7 +812,7 @@ namespace Xamarin.MacDev {
 
 		public unsafe void AddInternetPassword (Uri uri, string username, string password)
 		{
-			byte [] path = Encoding.UTF8.GetBytes (string.Join (string.Empty, uri.Segments).Substring (1)); // don't include the leading '/'
+			byte [] path = GetUriPathBytes (uri);
 			byte [] passwd = Encoding.UTF8.GetBytes (password);
 			byte [] host = Encoding.UTF8.GetBytes (uri.Host);
 			byte [] user = Encoding.UTF8.GetBytes (username);
@@ -848,9 +848,17 @@ namespace Xamarin.MacDev {
 
 		static readonly byte [] WebFormPassword = Encoding.UTF8.GetBytes ("Web form password");
 
+		// Extracts the URI path without the leading '/', returning an empty array for URIs with no path segments.
+		static byte [] GetUriPathBytes (Uri uri)
+		{
+			var joined = string.Join (string.Empty, uri.Segments);
+			var path = joined.Length > 0 && joined [0] == '/' ? joined.Substring (1) : joined;
+			return Encoding.UTF8.GetBytes (path);
+		}
+
 		public unsafe void AddInternetPassword (Uri uri, string password)
 		{
-			byte [] path = Encoding.UTF8.GetBytes (string.Join (string.Empty, uri.Segments).Substring (1)); // don't include the leading '/'
+			byte [] path = GetUriPathBytes (uri);
 			byte [] user = Encoding.UTF8.GetBytes (Uri.UnescapeDataString (uri.UserInfo));
 			byte [] passwd = Encoding.UTF8.GetBytes (password);
 			byte [] host = Encoding.UTF8.GetBytes (uri.Host);
@@ -920,7 +928,7 @@ namespace Xamarin.MacDev {
 
 		public unsafe Tuple<string, string> FindInternetUserNameAndPassword (Uri uri)
 		{
-			byte [] path = Encoding.UTF8.GetBytes (string.Join (string.Empty, uri.Segments).Substring (1)); // don't include the leading '/'
+			byte [] path = GetUriPathBytes (uri);
 			byte [] host = Encoding.UTF8.GetBytes (uri.Host);
 			var auth = GetSecAuthenticationType (uri.Query);
 			var protocol = GetSecProtocolType (uri.Scheme);
@@ -968,7 +976,7 @@ namespace Xamarin.MacDev {
 
 		public string FindInternetPassword (Uri uri)
 		{
-			byte [] path = Encoding.UTF8.GetBytes (string.Join (string.Empty, uri.Segments).Substring (1)); // don't include the leading '/'
+			byte [] path = GetUriPathBytes (uri);
 			byte [] user = Encoding.UTF8.GetBytes (Uri.UnescapeDataString (uri.UserInfo));
 			byte [] host = Encoding.UTF8.GetBytes (uri.Host);
 			var auth = GetSecAuthenticationType (uri.Query);
