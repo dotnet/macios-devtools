@@ -39,6 +39,9 @@
     <Compile Remove="NullableAttributes.cs" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="8.0.5" Condition=" '$(TargetFramework)' == 'netstandard2.0' " />
   </ItemGroup>
 </Project>

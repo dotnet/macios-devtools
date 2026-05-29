@@ -48,6 +48,15 @@ namespace Xamarin.MacDev {
 			}
 		}
 
+		const int ENOENT = 2;
+		const int EACCES = 13;
+		const int ENOTDIR = 20;
+
+		/// <summary>
+		/// Returns whether the given path is a symlink.
+		/// Returns false (rather than throwing) when the path cannot be examined
+		/// due to non-existence, permissions, or a non-directory path component.
+		/// </summary>
 		public static bool IsSymlink (string file)
 		{
 			if (Environment.OSVersion.Platform == PlatformID.Win32NT) {
@@ -56,8 +65,12 @@ namespace Xamarin.MacDev {
 			}
 			Stat buf;
 			var rv = lstat (file, out buf);
-			if (rv != 0)
-				throw new Exception (string.Format ("Could not lstat '{0}': {1}", file, Marshal.GetLastWin32Error ()));
+			if (rv != 0) {
+				var errno = Marshal.GetLastWin32Error ();
+				if (errno == ENOENT || errno == EACCES || errno == ENOTDIR)
+					return false;
+				throw new Exception (string.Format ("Could not lstat '{0}': {1}", file, errno));
+			}
 			const int S_IFLNK = 40960;
 			return (buf.st_mode & S_IFLNK) == S_IFLNK;
 		}
