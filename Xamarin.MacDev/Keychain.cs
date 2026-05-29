@@ -459,6 +459,7 @@ namespace Xamarin.MacDev {
 				if (SecIdentityCopyCertificate (itemRef, out certRef) == OSStatus.Ok) {
 					var data = SecCertificateCopyData (certRef);
 					var rawData = CFDataGetBytes (data);
+					CFRelease (data);
 
 					if (rawData != null) {
 						try {
@@ -520,6 +521,7 @@ namespace Xamarin.MacDev {
 				if (SecIdentityCopyCertificate (itemRef, out certRef) == OSStatus.Ok) {
 					var data = SecCertificateCopyData (certRef);
 					var rawData = CFDataGetBytes (data);
+					CFRelease (data);
 
 					if (rawData != null) {
 						try {
@@ -935,9 +937,14 @@ namespace Xamarin.MacDev {
 			if (result != OSStatus.Ok)
 				return null;
 
-			var username = GetUsernameFromKeychainItemRef (item);
-
-			return Tuple.Create (username, Marshal.PtrToStringAuto (passwordData, (int) passwordLength));
+			try {
+				var username = GetUsernameFromKeychainItemRef (item);
+				var password = Marshal.PtrToStringAuto (passwordData, (int) passwordLength);
+				return Tuple.Create (username, password);
+			} finally {
+				SecKeychainItemFreeContent (IntPtr.Zero, passwordData);
+				CFRelease (item);
+			}
 		}
 
 		public unsafe Tuple<string, string> FindInternetPassword (string serverName = "", string securityDomain = "", string accountName = "", string path = "", ushort port = 0)
@@ -961,9 +968,14 @@ namespace Xamarin.MacDev {
 			if (result != OSStatus.Ok)
 				return null;
 
-			var username = GetUsernameFromKeychainItemRef (item);
-
-			return Tuple.Create (username, Marshal.PtrToStringAuto (passwordData, (int) passwordLength));
+			try {
+				var username = GetUsernameFromKeychainItemRef (item);
+				var password = Marshal.PtrToStringAuto (passwordData, (int) passwordLength);
+				return Tuple.Create (username, password);
+			} finally {
+				SecKeychainItemFreeContent (IntPtr.Zero, passwordData);
+				CFRelease (item);
+			}
 		}
 
 		public string FindInternetPassword (Uri uri)
@@ -988,12 +1000,15 @@ namespace Xamarin.MacDev {
 														  (uint) user.Length, user, (uint) path.Length, path, (ushort) uri.Port,
 														  0, auth, out passwordLength, out passwordData, ref item);
 
-			CFRelease (item);
+			try {
+				if (result != OSStatus.Ok)
+					return null;
 
-			if (result != OSStatus.Ok)
-				return null;
-
-			return Marshal.PtrToStringAuto (passwordData, (int) passwordLength);
+				return Marshal.PtrToStringAuto (passwordData, (int) passwordLength);
+			} finally {
+				SecKeychainItemFreeContent (IntPtr.Zero, passwordData);
+				CFRelease (item);
+			}
 		}
 	}
 
