@@ -207,8 +207,8 @@ namespace Xamarin.MacDev {
 		}
 
 		/// <summary>
-		/// Initialize a <see cref="MonoDevelop.MacDev.PlatformVersion"/> struct with
-		/// version information encoded as a value of <see cref="ObjCRuntime.Platform"/>
+		/// Initialize a <c>PlatformVersion</c> struct with
+		/// version information encoded as a value of the <c>ObjCRuntime.Platform</c>
 		/// enum. For example (ulong)(Platform.iOS_8_0 | Platform.Mac_10_10).
 		/// </summary>
 		/// <param name="platformEncoding">Should have the bit format AAJJNNSSAAJJNNSS, where
