@@ -218,21 +218,28 @@ namespace Xamarin.MacDev {
 			return GetUIDeviceFamily (dict, ManifestKeys.UIDeviceFamily);
 		}
 
-		static AppleDeviceFamily ParseDeviceFamilyFromNumber (PNumber number)
+		static bool TryParseDeviceFamilyFromNumber (PNumber number, out AppleDeviceFamily family)
 		{
 			switch (number.Value) {
 			case 1:
-				return AppleDeviceFamily.IPhone;
+				family = AppleDeviceFamily.IPhone;
+				return true;
 			case 2:
-				return AppleDeviceFamily.IPad;
+				family = AppleDeviceFamily.IPad;
+				return true;
 			case 3:
-				return AppleDeviceFamily.TV;
+				family = AppleDeviceFamily.TV;
+				return true;
 			case 4:
-				return AppleDeviceFamily.Watch;
+				family = AppleDeviceFamily.Watch;
+				return true;
 			case 6:
-				return AppleDeviceFamily.MacCatalystOptimizedForMac;
+				family = AppleDeviceFamily.MacCatalystOptimizedForMac;
+				return true;
 			default:
-				throw new ArgumentOutOfRangeException (string.Format ("Unknown device family: {0}", number.Value));
+				LoggingService.LogWarning ($"Ignoring unrecognized device family number: {number.Value}");
+				family = default;
+				return false;
 			}
 		}
 
@@ -278,11 +285,12 @@ namespace Xamarin.MacDev {
 						val |= ParseDeviceTypeFromString (p);
 
 					var number = element as PNumber;
-					if (number != null)
-						val |= ParseDeviceFamilyFromNumber (number).ToDeviceType ();
+					if (number != null && TryParseDeviceFamilyFromNumber (number, out var family))
+						val |= family.ToDeviceType ();
 				}
 			} else if (value is PNumber) {
-				val |= ParseDeviceFamilyFromNumber ((PNumber) value).ToDeviceType ();
+				if (TryParseDeviceFamilyFromNumber ((PNumber) value, out var family))
+					val |= family.ToDeviceType ();
 			} else if (value is PString) {
 				val |= ParseDeviceTypeFromString ((PString) value);
 			}
@@ -496,6 +504,23 @@ namespace Xamarin.MacDev {
 			return extAtt;
 		}
 
+		static PDictionary GetOrCreateNSExtensionAttributes (this PDictionary dict)
+		{
+			var ext = dict.Get<PDictionary> ("NSExtension");
+			if (ext == null) {
+				ext = new PDictionary ();
+				dict ["NSExtension"] = ext;
+			}
+
+			var extAtt = ext.Get<PDictionary> ("NSExtensionAttributes");
+			if (extAtt == null) {
+				extAtt = new PDictionary ();
+				ext ["NSExtensionAttributes"] = extAtt;
+			}
+
+			return extAtt;
+		}
+
 		#endregion
 
 		#region Watch App Manifest Keys
@@ -513,6 +538,8 @@ namespace Xamarin.MacDev {
 		public static string GetWKAppBundleIdentifier (this PDictionary dict)
 		{
 			var extAtt = GetNSExtensionAttributes (dict);
+			if (extAtt == null)
+				return null;
 
 			var str = extAtt.Get<PString> (ManifestKeys.WKAppBundleIdentifier);
 			return str == null ? null : str.Value;
@@ -520,12 +547,14 @@ namespace Xamarin.MacDev {
 
 		public static void SetWKAppBundleIdentifier (this PDictionary dict, string value)
 		{
-			var extAtt = GetNSExtensionAttributes (dict);
-
-			if (string.IsNullOrEmpty (value))
-				extAtt.Remove (ManifestKeys.WKAppBundleIdentifier);
-			else
+			if (string.IsNullOrEmpty (value)) {
+				var extAtt = GetNSExtensionAttributes (dict);
+				if (extAtt != null)
+					extAtt.Remove (ManifestKeys.WKAppBundleIdentifier);
+			} else {
+				var extAtt = GetOrCreateNSExtensionAttributes (dict);
 				extAtt [ManifestKeys.WKAppBundleIdentifier] = value;
+			}
 		}
 
 		public static string GetWKCompanionAppBundleIdentifier (this PDictionary dict)
