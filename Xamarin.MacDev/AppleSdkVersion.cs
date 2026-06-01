@@ -38,7 +38,7 @@ namespace Xamarin.MacDev {
 		public AppleSdkVersion (Version version)
 		{
 			if (version == null)
-				throw new ArgumentNullException ();
+				throw new ArgumentNullException (nameof (version));
 
 			if (version.Build != -1) {
 				this.version = new int [3];
