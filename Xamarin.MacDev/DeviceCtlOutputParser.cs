@@ -78,7 +78,9 @@ public static class DeviceCtlOutputParser {
 					var newCpuType = GetObject (newHardwareProperties, "cpuType");
 					var cpuType = GetObject (properties, "cpuType");
 					var legacyCpuType = GetObject (hardwareProperties, "cpuType");
-					info.CpuArchitecture = GetString ("name", newCpuType, cpuType, legacyCpuType);
+					info.CpuArchitecture = GetCpuArchitecture (newCpuType);
+					if (string.IsNullOrEmpty (info.CpuArchitecture))
+						info.CpuArchitecture = GetString ("name", newCpuType, cpuType, legacyCpuType);
 
 					info.TransportType = GetString ("transportType", newConnectionProperties, stateProperties, properties, connectionProperties);
 					info.PairingState = GetString ("pairingState", newConnectionProperties, stateProperties, properties, connectionProperties);
@@ -109,6 +111,33 @@ public static class DeviceCtlOutputParser {
 			return value.ToString ();
 		}
 		return "";
+	}
+
+	static string GetCpuArchitecture (JsonElement? cpuType)
+	{
+		if (!cpuType.HasValue ||
+			!cpuType.Value.TryGetProperty ("type", out var typeElement) ||
+			!typeElement.TryGetInt32 (out var type))
+			return "";
+
+		switch (type) {
+		case 7:
+			return "i386";
+		case 12:
+			return "arm";
+		case 0x01000007:
+			return "x86_64";
+		case 0x0100000c:
+			if (cpuType.Value.TryGetProperty ("subtype", out var subtypeElement) &&
+				subtypeElement.TryGetInt32 (out var subtype) &&
+				(subtype & 0xff) == 2)
+				return "arm64e";
+			return "arm64";
+		case 0x0200000c:
+			return "arm64_32";
+		default:
+			return "";
+		}
 	}
 
 	static JsonElement? GetObject (JsonElement? element, string property)

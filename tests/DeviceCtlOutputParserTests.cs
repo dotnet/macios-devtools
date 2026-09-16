@@ -81,7 +81,6 @@ public class DeviceCtlOutputParserTests {
 							""osVersionNumber"": ""17.0""
 						},
 						""hardwareProperties"": {
-							""cpuType"": { ""name"": ""arm64e"" },
 							""hardwareModel"": ""D83AP""
 						},
 						""identifier"": ""33333333-AAAA-BBBB-CCCC-DDDDDDDDDDDD"",
@@ -139,6 +138,35 @@ public class DeviceCtlOutputParserTests {
 		Assert.That (device.CpuArchitecture, Is.EqualTo ("arm64e"));
 		Assert.That (device.TransportType, Is.EqualTo ("localNetwork"));
 		Assert.That (device.PairingState, Is.EqualTo ("paired"));
+	}
+
+	[Test]
+	public void ParseDevices_JsonVersion5_Arm64CpuType_ParsesArchitecture ()
+	{
+		var json = @"{
+			""info"": {
+				""jsonVersion"": 5
+			},
+			""result"": {
+				""devices"": [
+					{
+						""identifier"": ""ID-1"",
+						""properties"": {
+							""hardware"": {
+								""cpuType"": {
+									""subtype"": 0,
+									""type"": 16777228
+								}
+							}
+						}
+					}
+				]
+			}
+		}";
+
+		var result = DeviceCtlOutputParser.ParseDevices (json);
+		Assert.That (result.Count, Is.EqualTo (1));
+		Assert.That (result [0].CpuArchitecture, Is.EqualTo ("arm64"));
 	}
 
 	[Test]
