@@ -62,6 +62,114 @@ public class DeviceCtlOutputParserTests {
 	}
 
 	[Test]
+	public void ParseDevices_JsonVersion5_ParsesProperties ()
+	{
+		var json = @"{
+			""info"": {
+				""jsonVersion"": 5
+			},
+			""result"": {
+				""devices"": [
+					{
+						""_deprecationNotice"": {
+							""deprecatedFields"": [ ""hardwareProperties"", ""deviceProperties"", ""connectionProperties"" ],
+							""replacement"": ""properties""
+						},
+						""deviceProperties"": {
+							""name"": ""Deprecated name"",
+							""osBuildUpdate"": ""22A1"",
+							""osVersionNumber"": ""17.0""
+						},
+						""hardwareProperties"": {
+							""hardwareModel"": ""D83AP""
+						},
+						""identifier"": ""33333333-AAAA-BBBB-CCCC-DDDDDDDDDDDD"",
+						""properties"": {
+							""connection"": {
+								""pairingState"": ""paired"",
+								""transportType"": ""localNetwork""
+							},
+							""hardware"": {
+								""cpuType"": {
+									""subtype"": 18446744071562067970,
+									""type"": 16777228
+								},
+								""deviceType"": ""iPhone"",
+								""ecid"": 12345678,
+								""platform"": ""iOS"",
+								""productType"": ""iPhone16,1"",
+								""serialNumber"": ""SERIAL_1"",
+								""udid"": ""00008003-012301230123ABCD""
+							},
+							""software"": {
+								""osBuildVersions"": {
+									""buildVersion"": {
+										""name"": ""23B85""
+									}
+								},
+								""osVersionNumber"": {
+									""stringValue"": ""18.1""
+								}
+							},
+							""state"": {
+								""name"": ""Rolf's iPhone 15""
+							}
+						}
+					}
+				]
+			}
+		}";
+
+		var result = DeviceCtlOutputParser.ParseDevices (json);
+		Assert.That (result.Count, Is.EqualTo (1));
+
+		var device = result [0];
+		Assert.That (device.Name, Is.EqualTo ("Rolf's iPhone 15"));
+		Assert.That (device.Udid, Is.EqualTo ("00008003-012301230123ABCD"));
+		Assert.That (device.Identifier, Is.EqualTo ("33333333-AAAA-BBBB-CCCC-DDDDDDDDDDDD"));
+		Assert.That (device.BuildVersion, Is.EqualTo ("23B85"));
+		Assert.That (device.OSVersion, Is.EqualTo ("18.1"));
+		Assert.That (device.DeviceClass, Is.EqualTo ("iPhone"));
+		Assert.That (device.HardwareModel, Is.EqualTo ("D83AP"));
+		Assert.That (device.Platform, Is.EqualTo ("iOS"));
+		Assert.That (device.ProductType, Is.EqualTo ("iPhone16,1"));
+		Assert.That (device.SerialNumber, Is.EqualTo ("SERIAL_1"));
+		Assert.That (device.UniqueChipID, Is.EqualTo ((ulong) 12345678));
+		Assert.That (device.CpuArchitecture, Is.EqualTo ("arm64e"));
+		Assert.That (device.TransportType, Is.EqualTo ("localNetwork"));
+		Assert.That (device.PairingState, Is.EqualTo ("paired"));
+	}
+
+	[Test]
+	public void ParseDevices_JsonVersion5_Arm64CpuType_ParsesArchitecture ()
+	{
+		var json = @"{
+			""info"": {
+				""jsonVersion"": 5
+			},
+			""result"": {
+				""devices"": [
+					{
+						""identifier"": ""ID-1"",
+						""properties"": {
+							""hardware"": {
+								""cpuType"": {
+									""subtype"": 0,
+									""type"": 16777228
+								}
+							}
+						}
+					}
+				]
+			}
+		}";
+
+		var result = DeviceCtlOutputParser.ParseDevices (json);
+		Assert.That (result.Count, Is.EqualTo (1));
+		Assert.That (result [0].CpuArchitecture, Is.EqualTo ("arm64"));
+	}
+
+	[Test]
 	public void ParseDevices_MultipleDevices_ParsesAll ()
 	{
 		var json = @"{
