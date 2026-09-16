@@ -91,7 +91,7 @@ public class DeviceCtlOutputParserTests {
 							},
 							""hardware"": {
 								""cpuType"": {
-									""subtype"": 2,
+									""subtype"": 18446744071562067970,
 									""type"": 16777228
 								},
 								""deviceType"": ""iPhone"",

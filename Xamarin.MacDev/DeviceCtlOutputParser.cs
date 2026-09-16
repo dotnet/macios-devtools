@@ -129,7 +129,7 @@ public static class DeviceCtlOutputParser {
 			return "x86_64";
 		case 0x0100000c:
 			if (cpuType.Value.TryGetProperty ("subtype", out var subtypeElement) &&
-				subtypeElement.TryGetInt32 (out var subtype) &&
+				subtypeElement.TryGetUInt64 (out var subtype) &&
 				(subtype & 0xff) == 2)
 				return "arm64e";
 			return "arm64";
