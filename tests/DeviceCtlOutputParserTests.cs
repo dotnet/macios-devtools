@@ -75,28 +75,45 @@ public class DeviceCtlOutputParserTests {
 							""deprecatedFields"": [ ""hardwareProperties"", ""deviceProperties"", ""connectionProperties"" ],
 							""replacement"": ""properties""
 						},
+						""deviceProperties"": {
+							""name"": ""Deprecated name"",
+							""osBuildUpdate"": ""22A1"",
+							""osVersionNumber"": ""17.0""
+						},
+						""hardwareProperties"": {
+							""cpuType"": { ""name"": ""arm64e"" },
+							""hardwareModel"": ""D83AP""
+						},
 						""identifier"": ""33333333-AAAA-BBBB-CCCC-DDDDDDDDDDDD"",
 						""properties"": {
 							""connection"": {
+								""pairingState"": ""paired"",
 								""transportType"": ""localNetwork""
 							},
-							""device"": {
-								""name"": ""Rolf's iPhone 15""
-							},
 							""hardware"": {
-								""cpuType"": { ""name"": ""arm64e"" },
+								""cpuType"": {
+									""subtype"": 2,
+									""type"": 16777228
+								},
 								""deviceType"": ""iPhone"",
 								""ecid"": 12345678,
-								""hardwareModel"": ""D83AP"",
 								""platform"": ""iOS"",
 								""productType"": ""iPhone16,1"",
 								""serialNumber"": ""SERIAL_1"",
 								""udid"": ""00008003-012301230123ABCD""
 							},
+							""software"": {
+								""osBuildVersions"": {
+									""buildVersion"": {
+										""name"": ""23B85""
+									}
+								},
+								""osVersionNumber"": {
+									""stringValue"": ""18.1""
+								}
+							},
 							""state"": {
-								""osBuildUpdate"": ""23B85"",
-								""osVersionNumber"": ""18.1"",
-								""pairingState"": ""paired""
+								""name"": ""Rolf's iPhone 15""
 							}
 						}
 					}

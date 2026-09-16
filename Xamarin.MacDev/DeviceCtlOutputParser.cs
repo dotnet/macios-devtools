@@ -50,6 +50,10 @@ public static class DeviceCtlOutputParser {
 					var properties = GetObject (device, "properties");
 					var newDeviceProperties = GetObject (properties, "device");
 					var stateProperties = GetObject (properties, "state");
+					var softwareProperties = GetObject (properties, "software");
+					var osBuildVersions = GetObject (softwareProperties, "osBuildVersions");
+					var buildVersion = GetObject (osBuildVersions, "buildVersion");
+					var osVersionNumber = GetObject (softwareProperties, "osVersionNumber");
 					var newHardwareProperties = GetObject (properties, "hardware");
 					var newConnectionProperties = GetObject (properties, "connection");
 					var deviceProperties = GetObject (device, "deviceProperties");
@@ -57,8 +61,12 @@ public static class DeviceCtlOutputParser {
 					var connectionProperties = GetObject (device, "connectionProperties");
 
 					info.Name = GetString ("name", newDeviceProperties, stateProperties, properties, deviceProperties);
-					info.BuildVersion = GetString ("osBuildUpdate", stateProperties, newDeviceProperties, properties, deviceProperties);
-					info.OSVersion = GetString ("osVersionNumber", stateProperties, newDeviceProperties, properties, deviceProperties);
+					info.BuildVersion = GetString ("name", buildVersion);
+					if (string.IsNullOrEmpty (info.BuildVersion))
+						info.BuildVersion = GetString ("osBuildUpdate", stateProperties, newDeviceProperties, properties, deviceProperties);
+					info.OSVersion = GetString ("stringValue", osVersionNumber);
+					if (string.IsNullOrEmpty (info.OSVersion))
+						info.OSVersion = GetString ("osVersionNumber", stateProperties, newDeviceProperties, properties, deviceProperties);
 					info.Udid = GetString ("udid", newHardwareProperties, properties, hardwareProperties);
 					info.DeviceClass = GetString ("deviceType", newHardwareProperties, properties, hardwareProperties);
 					info.HardwareModel = GetString ("hardwareModel", newHardwareProperties, properties, hardwareProperties);
@@ -67,9 +75,10 @@ public static class DeviceCtlOutputParser {
 					info.SerialNumber = GetString ("serialNumber", newHardwareProperties, properties, hardwareProperties);
 					info.UniqueChipID = GetUInt64 ("ecid", newHardwareProperties, properties, hardwareProperties);
 
-					var cpuType = GetObject (newHardwareProperties, "cpuType") ?? GetObject (properties, "cpuType") ?? GetObject (hardwareProperties, "cpuType");
-					if (cpuType.HasValue)
-						info.CpuArchitecture = GetString (cpuType.Value, "name");
+					var newCpuType = GetObject (newHardwareProperties, "cpuType");
+					var cpuType = GetObject (properties, "cpuType");
+					var legacyCpuType = GetObject (hardwareProperties, "cpuType");
+					info.CpuArchitecture = GetString ("name", newCpuType, cpuType, legacyCpuType);
 
 					info.TransportType = GetString ("transportType", newConnectionProperties, stateProperties, properties, connectionProperties);
 					info.PairingState = GetString ("pairingState", newConnectionProperties, stateProperties, properties, connectionProperties);
