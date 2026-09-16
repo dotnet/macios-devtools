@@ -47,37 +47,32 @@ public static class DeviceCtlOutputParser {
 						Identifier = GetString (device, "identifier"),
 					};
 
-					// deviceProperties
-					if (device.TryGetProperty ("deviceProperties", out var deviceProps)) {
-						info.Name = GetString (deviceProps, "name");
-						info.BuildVersion = GetString (deviceProps, "osBuildUpdate");
-						info.OSVersion = GetString (deviceProps, "osVersionNumber");
-					}
+					var properties = GetObject (device, "properties");
+					var newDeviceProperties = GetObject (properties, "device");
+					var stateProperties = GetObject (properties, "state");
+					var newHardwareProperties = GetObject (properties, "hardware");
+					var newConnectionProperties = GetObject (properties, "connection");
+					var deviceProperties = GetObject (device, "deviceProperties");
+					var hardwareProperties = GetObject (device, "hardwareProperties");
+					var connectionProperties = GetObject (device, "connectionProperties");
 
-					// hardwareProperties
-					if (device.TryGetProperty ("hardwareProperties", out var hwProps)) {
-						info.Udid = GetString (hwProps, "udid");
-						info.DeviceClass = GetString (hwProps, "deviceType");
-						info.HardwareModel = GetString (hwProps, "hardwareModel");
-						info.Platform = GetString (hwProps, "platform");
-						info.ProductType = GetString (hwProps, "productType");
-						info.SerialNumber = GetString (hwProps, "serialNumber");
+					info.Name = GetString ("name", newDeviceProperties, stateProperties, properties, deviceProperties);
+					info.BuildVersion = GetString ("osBuildUpdate", stateProperties, newDeviceProperties, properties, deviceProperties);
+					info.OSVersion = GetString ("osVersionNumber", stateProperties, newDeviceProperties, properties, deviceProperties);
+					info.Udid = GetString ("udid", newHardwareProperties, properties, hardwareProperties);
+					info.DeviceClass = GetString ("deviceType", newHardwareProperties, properties, hardwareProperties);
+					info.HardwareModel = GetString ("hardwareModel", newHardwareProperties, properties, hardwareProperties);
+					info.Platform = GetString ("platform", newHardwareProperties, properties, hardwareProperties);
+					info.ProductType = GetString ("productType", newHardwareProperties, properties, hardwareProperties);
+					info.SerialNumber = GetString ("serialNumber", newHardwareProperties, properties, hardwareProperties);
+					info.UniqueChipID = GetUInt64 ("ecid", newHardwareProperties, properties, hardwareProperties);
 
-						if (hwProps.TryGetProperty ("ecid", out var ecidElement)) {
-							if (ecidElement.TryGetUInt64 (out var ecid))
-								info.UniqueChipID = ecid;
-						}
+					var cpuType = GetObject (newHardwareProperties, "cpuType") ?? GetObject (properties, "cpuType") ?? GetObject (hardwareProperties, "cpuType");
+					if (cpuType.HasValue)
+						info.CpuArchitecture = GetString (cpuType.Value, "name");
 
-						// cpuType.name
-						if (hwProps.TryGetProperty ("cpuType", out var cpuType))
-							info.CpuArchitecture = GetString (cpuType, "name");
-					}
-
-					// connectionProperties
-					if (device.TryGetProperty ("connectionProperties", out var connProps)) {
-						info.TransportType = GetString (connProps, "transportType");
-						info.PairingState = GetString (connProps, "pairingState");
-					}
+					info.TransportType = GetString ("transportType", newConnectionProperties, stateProperties, properties, connectionProperties);
+					info.PairingState = GetString ("pairingState", newConnectionProperties, stateProperties, properties, connectionProperties);
 
 					// Fallback: use identifier as UDID if hardware UDID is missing
 					if (string.IsNullOrEmpty (info.Udid))
@@ -105,5 +100,35 @@ public static class DeviceCtlOutputParser {
 			return value.ToString ();
 		}
 		return "";
+	}
+
+	static JsonElement? GetObject (JsonElement? element, string property)
+	{
+		if (element.HasValue && element.Value.TryGetProperty (property, out var value) && value.ValueKind == JsonValueKind.Object)
+			return value;
+		return null;
+	}
+
+	static string GetString (string property, params JsonElement? [] elements)
+	{
+		foreach (var element in elements) {
+			if (!element.HasValue)
+				continue;
+			var value = GetString (element.Value, property);
+			if (!string.IsNullOrEmpty (value))
+				return value;
+		}
+		return "";
+	}
+
+	static ulong? GetUInt64 (string property, params JsonElement? [] elements)
+	{
+		foreach (var element in elements) {
+			if (!element.HasValue || !element.Value.TryGetProperty (property, out var value))
+				continue;
+			if (value.TryGetUInt64 (out var result))
+				return result;
+		}
+		return null;
 	}
 }

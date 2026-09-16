@@ -62,6 +62,69 @@ public class DeviceCtlOutputParserTests {
 	}
 
 	[Test]
+	public void ParseDevices_JsonVersion5_ParsesProperties ()
+	{
+		var json = @"{
+			""info"": {
+				""jsonVersion"": 5
+			},
+			""result"": {
+				""devices"": [
+					{
+						""_deprecationNotice"": {
+							""deprecatedFields"": [ ""hardwareProperties"", ""deviceProperties"", ""connectionProperties"" ],
+							""replacement"": ""properties""
+						},
+						""identifier"": ""33333333-AAAA-BBBB-CCCC-DDDDDDDDDDDD"",
+						""properties"": {
+							""connection"": {
+								""transportType"": ""localNetwork""
+							},
+							""device"": {
+								""name"": ""Rolf's iPhone 15""
+							},
+							""hardware"": {
+								""cpuType"": { ""name"": ""arm64e"" },
+								""deviceType"": ""iPhone"",
+								""ecid"": 12345678,
+								""hardwareModel"": ""D83AP"",
+								""platform"": ""iOS"",
+								""productType"": ""iPhone16,1"",
+								""serialNumber"": ""SERIAL_1"",
+								""udid"": ""00008003-012301230123ABCD""
+							},
+							""state"": {
+								""osBuildUpdate"": ""23B85"",
+								""osVersionNumber"": ""18.1"",
+								""pairingState"": ""paired""
+							}
+						}
+					}
+				]
+			}
+		}";
+
+		var result = DeviceCtlOutputParser.ParseDevices (json);
+		Assert.That (result.Count, Is.EqualTo (1));
+
+		var device = result [0];
+		Assert.That (device.Name, Is.EqualTo ("Rolf's iPhone 15"));
+		Assert.That (device.Udid, Is.EqualTo ("00008003-012301230123ABCD"));
+		Assert.That (device.Identifier, Is.EqualTo ("33333333-AAAA-BBBB-CCCC-DDDDDDDDDDDD"));
+		Assert.That (device.BuildVersion, Is.EqualTo ("23B85"));
+		Assert.That (device.OSVersion, Is.EqualTo ("18.1"));
+		Assert.That (device.DeviceClass, Is.EqualTo ("iPhone"));
+		Assert.That (device.HardwareModel, Is.EqualTo ("D83AP"));
+		Assert.That (device.Platform, Is.EqualTo ("iOS"));
+		Assert.That (device.ProductType, Is.EqualTo ("iPhone16,1"));
+		Assert.That (device.SerialNumber, Is.EqualTo ("SERIAL_1"));
+		Assert.That (device.UniqueChipID, Is.EqualTo ((ulong) 12345678));
+		Assert.That (device.CpuArchitecture, Is.EqualTo ("arm64e"));
+		Assert.That (device.TransportType, Is.EqualTo ("localNetwork"));
+		Assert.That (device.PairingState, Is.EqualTo ("paired"));
+	}
+
+	[Test]
 	public void ParseDevices_MultipleDevices_ParsesAll ()
 	{
 		var json = @"{
