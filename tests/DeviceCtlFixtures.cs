@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using System.Globalization;
 using System.Linq;
+using System.Text.Json.Nodes;
 
 #nullable enable
 
@@ -23,6 +25,9 @@ static class DeviceCtlFixtures {
 	public const string WatchIdentifier = "33333333-AAAA-BBBB-CCCC-333333333333";
 
 	public const string LegacyIPadIdentifier = "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB";
+
+	public const string UnpairedIPhoneIdentifier = "44444444-AAAA-BBBB-CCCC-444444444444";
+	public const string UnpairedIPhoneUdid = "00008030-000F1E2D3C4B5A69";
 
 	/// <summary>
 	/// What Xcode 27 (devicectl 642.16, JSON version 5) writes for an iPad that CoreDevice cannot manage (an iPad Pro 9.7-inch,
@@ -91,6 +96,119 @@ static class DeviceCtlFixtures {
 	}
 	""";
 
+	/// <summary>
+	/// What Xcode 27 (devicectl 642.16, JSON version 5) writes for an iPhone that CoreDevice can manage, connected over USB, that has not been
+	/// paired with the Mac: all of the <c>properties</c> object, the pairing state <c>unpaired</c> and the connection state <c>disconnected</c>
+	/// (which devicectl shows as "available"). Like all version 5 output it also has the deprecated properties, and two values are only there:
+	/// the hardware model and the name of the CPU type, whose <c>subtype</c> is written unsigned in <c>properties</c> and signed in the
+	/// deprecated object. The identifiers, the name and the host names are made up, and what does not matter here (the capabilities and the
+	/// details of the build version) is left out. <see cref="WithoutDeprecatedProperties"/> gives the output without the deprecated properties.
+	/// </summary>
+	public const string UnpairedIPhoneDocument =
+	"""
+	{
+		"info": {
+			"arguments": [ "devicectl", "list", "devices", "--json-output", "devices.json" ],
+			"commandType": "devicectl.list.devices",
+			"environment": {},
+			"jsonVersion": 5,
+			"outcome": "success",
+			"version": "642.16"
+		},
+		"result": {
+			"devices": [
+				{
+					"_deprecationNotice": {
+						"deprecatedFields": [ "hardwareProperties", "deviceProperties", "connectionProperties" ],
+						"message": "The 'hardwareProperties', 'deviceProperties', 'connectionProperties' fields are deprecated and will be removed in a future release. Use the 'properties' dictionary instead.",
+						"replacement": "properties"
+					},
+					"capabilities": [],
+					"connectionProperties": {
+						"isMobileDeviceOnly": false,
+						"pairingState": "unpaired",
+						"potentialHostnames": [
+							"Test-iPhone.coredevice.local",
+							"44444444-AAAA-BBBB-CCCC-444444444444.coredevice.local",
+							"00008030-000F1E2D3C4B5A69.coredevice.local"
+						],
+						"transportType": "wired",
+						"tunnelState": "disconnected",
+						"tunnelTransportProtocol": "tcp"
+					},
+					"deviceProperties": {
+						"bootState": "booted",
+						"ddiServicesAvailable": false,
+						"name": "Test iPhone",
+						"osBuildUpdate": "24B5089g",
+						"osVersionNumber": "27.2"
+					},
+					"hardwareProperties": {
+						"cpuType": {
+							"name": "arm64e",
+							"subType": -2147483646,
+							"type": 16777228
+						},
+						"deviceType": "iPhone",
+						"ecid": 2345678901234567,
+						"hardwareModel": "N104AP",
+						"isProductionFused": true,
+						"platform": "iOS",
+						"productType": "iPhone12,1",
+						"supportedCPUTypes": [
+							{ "name": "arm64e", "subType": -2147483646, "type": 16777228 },
+							{ "name": "arm64", "subType": 0, "type": 16777228 }
+						],
+						"supportedDeviceFamilies": [ 1 ],
+						"udid": "00008030-000F1E2D3C4B5A69"
+					},
+					"identifier": "44444444-AAAA-BBBB-CCCC-444444444444",
+					"properties": {
+						"connection": {
+							"pairingState": "unpaired",
+							"state": "disconnected",
+							"transportType": "wired",
+							"tunnelTransportProtocol": "tcp"
+						},
+						"hardware": {
+							"cpuType": {
+								"subtype": 18446744071562067970,
+								"type": 16777228
+							},
+							"deviceType": "iPhone",
+							"ecid": 2345678901234567,
+							"platform": "iOS",
+							"productType": "iPhone12,1",
+							"supportedCPUTypes": [
+								{ "subtype": 18446744071562067970, "type": 16777228 },
+								{ "subtype": 0, "type": 16777228 }
+							],
+							"supportedDeviceFamilies": [ 1 ],
+							"udid": "00008030-000F1E2D3C4B5A69"
+						},
+						"software": {
+							"osBuildVersions": {
+								"buildVersion": {
+									"name": "24B5089g"
+								}
+							},
+							"osVersionNumber": {
+								"stringValue": "27.2"
+							}
+						},
+						"state": {
+							"bootState": "booted",
+							"name": "Test iPhone"
+						}
+					},
+					"propertyDisplayNames": null,
+					"visibilityClass": "default"
+				}
+			]
+		}
+	}
+	""";
+
 	/// <summary>A devicectl document (JSON version 5) containing the given device entries.</summary>
 	public static string Document (params string [] devices) => Wrap (5, devices);
 
@@ -100,6 +218,24 @@ static class DeviceCtlFixtures {
 	/// <summary>What devicectl writes when a command fails.</summary>
 	public static string ErrorDocument (string description) =>
 		"{\"error\":{\"code\":1000,\"domain\":\"com.apple.dt.CoreDeviceError\",\"userInfo\":{\"NSLocalizedDescription\":{\"string\":\"" + description + "\"}}},\"info\":{\"outcome\":\"failed\"}}";
+
+	/// <summary>
+	/// The document as <c>devicectl list devices --omit-deprecated-fields-in-json</c> writes it: without the deprecated properties
+	/// (<c>hardwareProperties</c>, <c>deviceProperties</c>, <c>connectionProperties</c> and the notice about them) of every device.
+	/// devicectl says that a future release will not write them either.
+	/// </summary>
+	public static string WithoutDeprecatedProperties (string document)
+	{
+		var root = JsonNode.Parse (document) ?? throw new ArgumentException ("The document is not JSON.", nameof (document));
+		var devices = root ["result"]? ["devices"]?.AsArray () ?? throw new ArgumentException ("The document has no devices.", nameof (document));
+
+		foreach (var device in devices.OfType<JsonObject> ()) {
+			foreach (var deprecated in new [] { "_deprecationNotice", "hardwareProperties", "deviceProperties", "connectionProperties" })
+				device.Remove (deprecated);
+		}
+
+		return root.ToJsonString ();
+	}
 
 	/// <summary>A device entry in the JSON version 5 layout (the <c>properties</c> object).</summary>
 	public static string Device (

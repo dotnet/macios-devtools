@@ -232,5 +232,90 @@ public class MaciosParityTests {
 		Assert.That (task.DiscardedDevices [0].Status, Is.EqualTo ("Unsupported"));
 	}
 
+	[Test]
+	public async Task UnpairedIPhoneThatCoreDeviceCanManage_IsListedWithAllItsMetadata ()
+	{
+		var discovery = await ListAsync (UnpairedIPhoneDocument);
+
+		Assert.That (discovery.Status, Is.EqualTo (PhysicalDeviceDiscoveryStatus.Success));
+		Assert.That (discovery.Devices, Has.Count.EqualTo (1));
+		var device = discovery.Devices [0];
+		Assert.Multiple (() => {
+			Assert.That (device.Name, Is.EqualTo ("Test iPhone"));
+			Assert.That (device.Kind, Is.EqualTo (PhysicalDeviceKind.IPhone));
+			Assert.That (device.DeviceClass, Is.EqualTo ("iPhone"));
+			Assert.That (device.Platform, Is.EqualTo ("iOS"));
+			Assert.That (device.ProductType, Is.EqualTo ("iPhone12,1"));
+			Assert.That (device.OSVersion, Is.EqualTo ("27.2"));
+			Assert.That (device.BuildVersion, Is.EqualTo ("24B5089g"));
+			Assert.That (device.HardwareUdid, Is.EqualTo (UnpairedIPhoneUdid));
+			Assert.That (device.Identifier, Is.EqualTo (UnpairedIPhoneIdentifier));
+			Assert.That (device.UniqueChipID, Is.EqualTo (2345678901234567UL));
+			Assert.That (device.TransportType, Is.EqualTo ("wired"));
+			Assert.That (device.Connections, Has.Count.EqualTo (1));
+			Assert.That (device.Reality, Is.Empty, "devicectl did not report a reality for this device.");
+			Assert.That (device.SerialNumber, Is.Empty);
+			Assert.That (device.MarketingName, Is.Empty);
+
+			// Only the deprecated properties have the hardware model, and the CPU type in properties has numbers (with an unsigned subtype) and no name.
+			Assert.That (device.HardwareModel, Is.EqualTo ("N104AP"));
+			Assert.That (device.CpuArchitecture, Is.EqualTo ("arm64e"));
+
+			// A device that devicectl shows as available is reachable, whether it is paired or not.
+			Assert.That (device.PairingState, Is.EqualTo ("unpaired"));
+			Assert.That (device.ConnectionState, Is.EqualTo ("disconnected"));
+			Assert.That (device.Availability, Is.EqualTo (PhysicalDeviceAvailability.Available));
+			Assert.That (device.IsReachable, Is.True);
+		});
+	}
+
+	[Test]
+	public async Task UnpairedIPhoneWithoutTheDeprecatedProperties_IsListedWithoutItsHardwareModelOnly ()
+	{
+		// devicectl says that a future release will not write the deprecated properties, and --omit-deprecated-fields-in-json already omits them.
+		var discovery = await ListAsync (WithoutDeprecatedProperties (UnpairedIPhoneDocument));
+
+		Assert.That (discovery.Status, Is.EqualTo (PhysicalDeviceDiscoveryStatus.Success));
+		Assert.That (discovery.Devices, Has.Count.EqualTo (1));
+		var device = discovery.Devices [0];
+		Assert.Multiple (() => {
+			Assert.That (device.Name, Is.EqualTo ("Test iPhone"));
+			Assert.That (device.Kind, Is.EqualTo (PhysicalDeviceKind.IPhone));
+			Assert.That (device.ProductType, Is.EqualTo ("iPhone12,1"));
+			Assert.That (device.OSVersion, Is.EqualTo ("27.2"));
+			Assert.That (device.BuildVersion, Is.EqualTo ("24B5089g"));
+			Assert.That (device.HardwareUdid, Is.EqualTo (UnpairedIPhoneUdid));
+			Assert.That (device.TransportType, Is.EqualTo ("wired"));
+			Assert.That (device.PairingState, Is.EqualTo ("unpaired"));
+			Assert.That (device.ConnectionState, Is.EqualTo ("disconnected"));
+			Assert.That (device.Availability, Is.EqualTo (PhysicalDeviceAvailability.Available));
+			Assert.That (device.CpuArchitecture, Is.EqualTo ("arm64e"), "Without the name of the CPU type the architecture comes from its numbers, and the subtype is unsigned.");
+			Assert.That (device.HardwareModel, Is.Empty, "Only the deprecated properties have the hardware model.");
+		});
+
+		// What the task needs of the device is still there.
+		var task = MaciosDeviceMapping.Map (discovery.Devices);
+		Assert.That (task.DiscardedDevices, Is.Empty);
+		Assert.That (task.Devices.Select (d => d.RuntimeIdentifier), Is.EqualTo (new [] { "ios-arm64" }));
+	}
+
+	[Test]
+	public async Task UnpairedIPhoneThatCoreDeviceCanManage_IsKeptByTheTaskWhicheverWayItIsListed ()
+	{
+		var viaParser = MaciosDeviceMapping.Map (DeviceCtlOutputParser.ParseDevices (UnpairedIPhoneDocument));
+		var viaService = MaciosDeviceMapping.Map ((await ListAsync (UnpairedIPhoneDocument)).Devices);
+
+		foreach (var task in new [] { viaParser, viaService }) {
+			Assert.That (task.DiscardedDevices, Is.Empty);
+			Assert.That (task.Devices, Has.Count.EqualTo (1));
+			Assert.Multiple (() => {
+				Assert.That (task.Devices [0].ItemSpec, Is.EqualTo (UnpairedIPhoneUdid));
+				Assert.That (task.Devices [0].Description, Is.EqualTo ("Test iPhone - iOS 27.2"));
+				Assert.That (task.Devices [0].RuntimeIdentifier, Is.EqualTo ("ios-arm64"));
+				Assert.That (task.Devices [0].Status, Is.EqualTo ("Unpaired"));
+			});
+		}
+	}
+
 	#endregion
 }

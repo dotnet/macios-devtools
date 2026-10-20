@@ -46,7 +46,7 @@ public class PhysicalDeviceInfo {
 	/// <summary>The device class (e.g. "iPhone", "iPad", "appleWatch").</summary>
 	public string DeviceClass { get; set; } = "";
 
-	/// <summary>The hardware model (e.g. "D83AP").</summary>
+	/// <summary>The hardware model (e.g. "D83AP"). Xcode 27's devicectl only reports it in its deprecated properties, so it is empty when they are omitted.</summary>
 	public string HardwareModel { get; set; } = "";
 
 	/// <summary>The platform (e.g. "iOS", "watchOS").</summary>
