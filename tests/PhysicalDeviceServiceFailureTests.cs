@@ -115,6 +115,8 @@ public class PhysicalDeviceServiceFailureTests {
 	[TestCase (1, "xcode-select: error: tool 'devicectl' requires Xcode, but active developer directory '/Library/Developer/CommandLineTools' is a command line tools instance")]
 	[TestCase (1, "No developer tools were found, requesting install.")]
 	[TestCase (1, "XCRUN: ERROR: something else")]
+	[TestCase (69, "Agreeing to the Xcode/iOS license requires admin privileges, please run \u201csudo xcodebuild -license\u201d and then retry this command.")]
+	[TestCase (69, "You have not agreed to the Xcode license agreements. Please run 'sudo xcodebuild -license' from within a Terminal window to review and agree to the Xcode license agreements.")]
 	public async Task ListAsync_XcrunCannotRunDeviceCtl_ReturnsToolUnavailable (int exitCode, string stderr)
 	{
 		var service = CreateService (log, ReturnsJson (null, exitCode: exitCode, stderr: stderr + "\n"));
@@ -227,6 +229,10 @@ public class PhysicalDeviceServiceFailureTests {
 	[TestCase ("{\"result\":[]}")]
 	[TestCase ("{\"result\":{\"devices\":{}}}")]
 	[TestCase ("{\"result\":{\"devices\":[42]}}")]
+	[TestCase ("{\"result\":{\"devices\":[{}]}}")]
+	[TestCase ("{\"result\":{\"devices\":[{\"identifier\":\"\"}]}}")]
+	[TestCase ("{\"result\":{\"devices\":[{\"identifier\":42}]}}")]
+	[TestCase ("{\"result\":{\"devices\":[{\"identifier\":\"CD-1\"},{}]}}")]
 	public async Task ListAsync_OutputThatIsNotADeviceList_ReturnsInvalidOutput (string? json)
 	{
 		var service = CreateService (log, ReturnsJson (json));
@@ -327,6 +333,15 @@ public class PhysicalDeviceServiceFailureTests {
 		var result = await service.ListAsync (TimeSpan.FromMinutes (5));
 
 		Assert.That (result.Status, Is.EqualTo (PhysicalDeviceDiscoveryStatus.Success));
+	}
+
+	[Test]
+	public void ListAsync_RunnerThatThrowsAnUnrelatedCancellation_IsNotReportedAsATimeout ()
+	{
+		// Neither the timeout nor the caller cancelled anything, so this is an internal fault and not a timeout.
+		var service = CreateService (log, _ => throw new OperationCanceledException ("not requested by anyone"));
+
+		Assert.CatchAsync<OperationCanceledException> (async () => await service.ListAsync (Generous));
 	}
 
 	[Test]
@@ -441,9 +456,33 @@ public class PhysicalDeviceServiceFailureTests {
 		var runner = ReturnsJson (Document ());
 
 		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (null!));
+		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (null!, "/Applications/Xcode.app/Contents/Developer"));
 		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (null!, runner, () => true, ShortGracePeriod));
 		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (log, null!, () => true, ShortGracePeriod));
 		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (log, runner, null!, ShortGracePeriod));
+	}
+
+	[TestCase (null)]
+	[TestCase ("")]
+	[TestCase ("   ")]
+	[TestCase ("/Applications/Xcode.app/Contents/Developer")]
+	public void Constructor_DeveloperRoot_IsOptional (string? developerRoot)
+	{
+		Assert.DoesNotThrow (() => new PhysicalDeviceService (log, developerRoot));
+	}
+
+	[Test]
+	[Platform ("MacOsX")]
+	public async Task ListAsync_RealXcrunWithADeveloperRootThatDoesNotExist_ReportsItAsToolUnavailable ()
+	{
+		// xcrun rejects the directory before it looks for devicectl, so no Xcode or device is needed. Because xcrun
+		// repeats the directory in its message, this also proves the value reaches the real xcrun.
+		var missing = "/nonexistent-" + Path.GetRandomFileName () + "/Developer";
+
+		var result = await new PhysicalDeviceService (log, missing).ListAsync (TimeSpan.FromSeconds (60));
+
+		AssertFailure (result, PhysicalDeviceDiscoveryStatus.ToolUnavailable);
+		Assert.That (result.ErrorMessage, Does.Contain (missing));
 	}
 
 	#endregion
@@ -476,12 +515,12 @@ public class PhysicalDeviceServiceFailureTests {
 	}
 
 	[Test]
-	public async Task ListAsync_Failure_IsLoggedAsAWarningWithTheStatusAndMessage ()
+	public async Task ListAsync_Failure_IsLoggedAtInfoLevelWithTheStatusAndMessage ()
 	{
 		await CreateService (log, ReturnsJson (null, exitCode: 64, stderr: "ERROR: Invalid filter.")).ListAsync ();
 
-		Assert.That (log.Warnings, Has.Count.EqualTo (1));
-		Assert.That (log.Warnings [0], Does.Contain ("ExecutionFailed").And.Contain ("ERROR: Invalid filter."));
+		Assert.That (log.Messages, Has.Some.Contain ("(ExecutionFailed): ERROR: Invalid filter."));
+		Assert.That (log.Warnings, Is.Empty, "MSBuild turns warnings into build warnings, and the failure is already in the result.");
 	}
 
 	[Test]
@@ -489,7 +528,7 @@ public class PhysicalDeviceServiceFailureTests {
 	{
 		await CreateService (log, ReturnsJson (null, exitCode: 1, stderr: "failed {0} {unclosed")).ListAsync ();
 
-		Assert.That (log.Warnings, Has.Some.Contain ("failed {0} {unclosed"));
+		Assert.That (log.Messages, Has.Some.Contain ("failed {0} {unclosed"));
 	}
 
 	[Test]

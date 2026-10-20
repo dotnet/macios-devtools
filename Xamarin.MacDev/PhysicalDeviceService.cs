@@ -27,11 +27,12 @@ namespace Xamarin.MacDev {
 	/// caller cancellation and unexpected internal errors throw.
 	/// </para>
 	/// <para>
-	/// Requirements: macOS with Xcode 15 or later selected (devicectl is not part of older Xcode versions or of
-	/// the Command Line Tools, and Xcode 15 requires macOS 13.5 or later). devicectl manages devices through
-	/// CoreDevice, which targets iOS and iPadOS 17, tvOS 17, watchOS 10 and visionOS devices; devices running
-	/// older operating systems may be missing from the list. On any other host, discovery returns
-	/// <see cref="PhysicalDeviceDiscoveryStatus.UnsupportedHost"/> without running anything.
+	/// Requirements: macOS with Xcode 15 or later (devicectl is not part of older Xcode versions or of the Command
+	/// Line Tools, and Xcode 15 requires macOS 13.5 or later). By default the Xcode that the environment selects
+	/// (<c>DEVELOPER_DIR</c> or <c>xcode-select</c>) is used; to use a specific one, pass its developer directory to the
+	/// constructor. devicectl manages devices through CoreDevice, which targets iOS and iPadOS 17, tvOS 17, watchOS 10
+	/// and visionOS devices; devices running older operating systems may be missing from the list. On any other host,
+	/// discovery returns <see cref="PhysicalDeviceDiscoveryStatus.UnsupportedHost"/> without running anything.
 	/// </para>
 	/// <para>
 	/// Discovery is read-only: it never pairs with, trusts, connects to or modifies a device.
@@ -47,7 +48,9 @@ namespace Xamarin.MacDev {
 	/// hardware UDID cannot be correlated and are never merged (see <see cref="PhysicalDeviceInfo.HasHardwareUdid"/>).
 	/// </para>
 	/// <para>
-	/// All diagnostics go to the <see cref="ICustomLogger"/>; nothing is written to stdout.
+	/// All diagnostics go to the <see cref="ICustomLogger"/>; nothing is written to stdout. A failed discovery is
+	/// logged at info level because it is already reported in the result; only an abnormal condition (a devicectl runner
+	/// that does not stop when cancelled) is logged as a warning.
 	/// </para>
 	/// </remarks>
 	public class PhysicalDeviceService {
@@ -63,9 +66,24 @@ namespace Xamarin.MacDev {
 		readonly Func<bool> isSupportedHost;
 		readonly TimeSpan gracePeriod;
 
-		/// <summary>Creates a service that runs <c>xcrun devicectl</c> on the current host.</summary>
+		/// <summary>Creates a service that runs <c>xcrun devicectl</c> on the current host, with the Xcode the environment selects.</summary>
 		public PhysicalDeviceService (ICustomLogger log)
-			: this (log, new DeviceCtl (log ?? throw new ArgumentNullException (nameof (log))).ListDevicesAsync, () => IsSupportedHost, DefaultGracePeriod)
+			: this (log, developerRoot: null)
+		{
+		}
+
+		/// <summary>
+		/// Creates a service that runs <c>xcrun devicectl</c> on the current host, with the Xcode installed at
+		/// <paramref name="developerRoot"/> instead of the one <c>xcode-select</c> or <c>DEVELOPER_DIR</c> selects.
+		/// </summary>
+		/// <param name="log">Receives all diagnostics.</param>
+		/// <param name="developerRoot">The Xcode developer directory, for example <c>/Applications/Xcode.app/Contents/Developer</c>
+		/// (see <see cref="AppleSdkSettings.DeveloperRoot"/>). It is passed as <c>DEVELOPER_DIR</c> to the devicectl process
+		/// only; the environment of the current process is not changed, so services for different Xcode installations can
+		/// be used concurrently. <c>null</c>, empty or white space uses the Xcode the environment selects.
+		/// A directory that does not exist or is not an Xcode results in <see cref="PhysicalDeviceDiscoveryStatus.ToolUnavailable"/>.</param>
+		public PhysicalDeviceService (ICustomLogger log, string? developerRoot)
+			: this (log, new DeviceCtl (log ?? throw new ArgumentNullException (nameof (log)), developerRoot: developerRoot).ListDevicesAsync, () => IsSupportedHost, DefaultGracePeriod)
 		{
 		}
 
@@ -117,7 +135,7 @@ namespace Xamarin.MacDev {
 				timeoutSource.CancelAfter (timeout);
 				try {
 					run = await RunBoundedAsync (timeoutSource.Token).ConfigureAwait (false);
-				} catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) {
+				} catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested && !cancellationToken.IsCancellationRequested) {
 					var seconds = timeout.TotalSeconds.ToString ("0.###", CultureInfo.InvariantCulture);
 					return Fail (PhysicalDeviceDiscoveryStatus.TimedOut, $"devicectl did not finish within {seconds} seconds and was terminated.");
 				}
@@ -185,16 +203,20 @@ namespace Xamarin.MacDev {
 
 		PhysicalDeviceDiscoveryResult Fail (PhysicalDeviceDiscoveryStatus status, string message, int? exitCode = null)
 		{
-			log.LogWarning ("Physical device discovery failed ({0}): {1}", status, message);
+			// The failure is part of the result and the caller decides how loud to be: MSBuild tasks turn ICustomLogger
+			// warnings into build warnings, which would fail builds that treat warnings as errors.
+			log.LogInfo ("Physical device discovery failed ({0}): {1}", status, message);
 			return new PhysicalDeviceDiscoveryResult (status, errorMessage: message, exitCode: exitCode);
 		}
 
 		static bool IsXcrunFailure (DeviceCtlRunResult run, string stderr)
 		{
 			// xcrun and xcode-select report problems locating or launching the tool with these messages, before devicectl runs.
+			// Until the Xcode license is accepted xcrun refuses to run any tool and points at 'sudo xcodebuild -license'.
 			if (Contains (stderr, "xcrun: error:") ||
 				Contains (stderr, "xcode-select: error:") ||
-				Contains (stderr, "no developer tools were found"))
+				Contains (stderr, "no developer tools were found") ||
+				Contains (stderr, "xcodebuild -license"))
 				return true;
 
 			// EX_OSFILE is the exit code xcrun uses when it cannot find the tool. devicectl itself

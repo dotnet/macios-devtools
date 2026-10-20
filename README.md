@@ -31,13 +31,19 @@ foreach (var device in result.Devices.Where (d => d.Kind == PhysicalDeviceKind.I
 	Console.WriteLine ($"{device.Name} {device.HardwareUdid} ({device.OSVersion}, {device.Availability})");
 ```
 
+By default devicectl runs with the Xcode that `DEVELOPER_DIR` or `xcode-select` selects. To use a specific Xcode, pass its developer directory, for example `AppleSdkSettings.DeveloperRoot` or the `SdkDevPath` of an MSBuild task. It is set as `DEVELOPER_DIR` for the devicectl process only, so the environment of the current process is not changed and services for different Xcode installations can be used concurrently:
+
+```csharp
+var service = new PhysicalDeviceService (logger, "/Applications/Xcode.app/Contents/Developer");
+```
+
 `ListAsync` reports failures through `PhysicalDeviceDiscoveryResult.Status` instead of throwing, so an empty device list can be told apart from a failure:
 
 | Status | Meaning |
 | --- | --- |
 | `Success` | devicectl ran and its output was understood. `Devices` may be empty, which means no physical device is known. |
 | `UnsupportedHost` | The host is not macOS. Nothing was run. |
-| `ToolUnavailable` | `xcrun` or `devicectl` is missing, for example because Xcode is not installed, is too old or is not selected. |
+| `ToolUnavailable` | `xcrun` or `devicectl` is missing, for example because Xcode is not installed, is too old, is not selected or its license has not been accepted. |
 | `ExecutionFailed` | devicectl ran but failed (a non-zero exit code or an error in its output). `ExitCode` and `ErrorMessage` describe the failure. |
 | `TimedOut` | devicectl did not finish in time and was terminated. |
 | `InvalidOutput` | devicectl exited successfully, but its output was missing, malformed or in an unexpected format. |
@@ -55,13 +61,13 @@ Only invalid arguments (`ArgumentOutOfRangeException` for a non-positive timeout
 
 ### Requirements and behavior
 
-- Requires macOS with Xcode 15 or later selected, because `devicectl` ships with Xcode 15 and later and not with the Command Line Tools. Xcode 15 itself requires macOS 13.5 or later. devicectl manages devices through CoreDevice, which targets iOS and iPadOS 17, tvOS 17, watchOS 10 and visionOS. Devices running older operating systems may be missing from the list; that is decided by devicectl, not by this library.
+- Requires macOS with Xcode 15 or later (selected, or passed as the developer directory), because `devicectl` ships with Xcode 15 and later and not with the Command Line Tools. Xcode 15 itself requires macOS 13.5 or later. devicectl manages devices through CoreDevice, which targets iOS and iPadOS 17, tvOS 17, watchOS 10 and visionOS. Devices running older operating systems may be missing from the list; that is decided by devicectl, not by this library.
 - On any other host `ListAsync` returns `UnsupportedHost` without running anything. `PhysicalDeviceService.IsSupportedHost` tells whether the current host is supported.
-- If Xcode is missing, too old or not selected, `ListAsync` returns `ToolUnavailable` with a message describing the problem (xcrun's own message when it reported one).
+- If Xcode is missing, too old, not selected or its license has not been accepted, `ListAsync` returns `ToolUnavailable` with a message describing the problem (xcrun's own message when it reported one). The same status is returned for a developer directory that does not exist.
 - Discovery is read-only. It only runs `devicectl list devices`; it never pairs with, trusts, connects to or modifies a device. devicectl writes its JSON output to a temporary file (`--json-output`) that is deleted afterwards.
-- `ListAsync` waits at most `PhysicalDeviceService.DefaultTimeout` (30 seconds). Use `ListAsync (TimeSpan, CancellationToken)` for another limit. When the timeout elapses, or the `CancellationToken` is cancelled, devicectl is terminated (the `net10.0` build of the library also terminates any process devicectl started), so no child process is left behind.
-- Diagnostics are written to the `ICustomLogger` passed to the constructor. The service never writes to stdout.
-- `DeviceCtlOutputParser.ParseDevices` is unchanged and stays lenient: it returns every entry, including simulators, and keeps the `Udid` fallback. `DeviceCtlOutputParser.TryParseDevices` is its strict counterpart and reports output that is not a valid devicectl device list.
+- `ListAsync` waits at most `PhysicalDeviceService.DefaultTimeout` (30 seconds). Use `ListAsync (TimeSpan, CancellationToken)` for another limit. When the timeout elapses, or the `CancellationToken` is cancelled, devicectl is terminated (the `net10.0` build of the library also terminates the processes devicectl started that are still running). The call never waits longer than the timeout plus a short grace period, even for a runner that ignores cancellation.
+- Diagnostics are written to the `ICustomLogger` passed to the constructor. The service never writes to stdout. A failed discovery is logged at info level because the result already carries it, and a logger that turns warnings into build warnings (as MSBuild tasks do) should not fail a build over a missing Xcode; only a devicectl runner that does not stop when cancelled is logged as a warning.
+- `DeviceCtlOutputParser.ParseDevices` stays lenient: it returns every entry, including simulators and entries without an identity, and keeps the `Udid` fallback. `DeviceCtlOutputParser.TryParseDevices` is its strict counterpart and reports output that is not a valid devicectl device list, including an entry without a text `identifier`.
 
 ## License
 

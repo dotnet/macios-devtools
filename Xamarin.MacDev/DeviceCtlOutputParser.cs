@@ -67,6 +67,8 @@ public static class DeviceCtlOutputParser {
 	/// Unlike <see cref="ParseDevices"/> this distinguishes a valid, empty device list (returns <c>true</c>
 	/// with an empty list) from output that is missing, malformed or not in the expected format
 	/// (returns <c>false</c> with a description in <paramref name="error"/>).
+	/// Every entry must have a text <c>identifier</c>, and a text hardware <c>udid</c> if it has one;
+	/// an entry that does not makes the whole output invalid rather than becoming a device nobody can address.
 	/// </summary>
 	/// <param name="json">The contents of the devicectl JSON output.</param>
 	/// <param name="devices">All parsed entries in the order devicectl reported them, including simulators and
@@ -103,6 +105,9 @@ public static class DeviceCtlOutputParser {
 						error = "The devicectl JSON output contains a 'result.devices' entry that is not an object.";
 						return false;
 					}
+					error = GetIdentityError (device);
+					if (error is not null)
+						return false;
 					parsed.Add (ParseDevice (device));
 				}
 
@@ -164,6 +169,27 @@ public static class DeviceCtlOutputParser {
 		if (description.ValueKind == JsonValueKind.Object)
 			return GetString (description, "string");
 		return "";
+	}
+
+	// devicectl names every device with its CoreDevice identifier, and with its hardware UDID when the hardware has one.
+	// The lenient parser keeps whatever it finds; the strict one needs an identity it can rely on.
+	static string? GetIdentityError (JsonElement device)
+	{
+		if (!device.TryGetProperty ("identifier", out var identifier) ||
+			identifier.ValueKind != JsonValueKind.String ||
+			string.IsNullOrWhiteSpace (identifier.GetString ()))
+			return "The devicectl JSON output contains a 'result.devices' entry without a valid 'identifier'.";
+
+		var properties = GetObject (device, "properties");
+		foreach (var hardware in new [] { GetObject (properties, "hardware"), properties, GetObject (device, "hardwareProperties") }) {
+			if (hardware.HasValue &&
+				hardware.Value.TryGetProperty ("udid", out var udid) &&
+				udid.ValueKind != JsonValueKind.String &&
+				udid.ValueKind != JsonValueKind.Null)
+				return "The devicectl JSON output contains a 'result.devices' entry whose hardware 'udid' is not text.";
+		}
+
+		return null;
 	}
 
 	static PhysicalDeviceInfo ParseDevice (JsonElement device)
@@ -251,8 +277,10 @@ public static class DeviceCtlOutputParser {
 
 	static string GetCpuArchitecture (JsonElement? cpuType)
 	{
+		// TryGet* throws for a value of another kind, and these properties are optional metadata, so check first.
 		if (!cpuType.HasValue ||
 			!cpuType.Value.TryGetProperty ("type", out var typeElement) ||
+			typeElement.ValueKind != JsonValueKind.Number ||
 			!typeElement.TryGetInt32 (out var type))
 			return "";
 
@@ -265,6 +293,7 @@ public static class DeviceCtlOutputParser {
 			return "x86_64";
 		case 0x0100000c:
 			if (cpuType.Value.TryGetProperty ("subtype", out var subtypeElement) &&
+				subtypeElement.ValueKind == JsonValueKind.Number &&
 				subtypeElement.TryGetUInt64 (out var subtype) &&
 				(subtype & 0xff) == 2)
 				return "arm64e";
@@ -300,7 +329,7 @@ public static class DeviceCtlOutputParser {
 		foreach (var element in elements) {
 			if (!element.HasValue || !element.Value.TryGetProperty (property, out var value))
 				continue;
-			if (value.TryGetUInt64 (out var result))
+			if (value.ValueKind == JsonValueKind.Number && value.TryGetUInt64 (out var result))
 				return result;
 		}
 		return null;

@@ -61,6 +61,13 @@ static class ProcessTestHelper {
 		return true;
 	}
 
+	/// <summary>Kills the process if it is still running, so that a test that fails early does not leave it behind.</summary>
+	public static void Kill (int pid)
+	{
+		if (IsAlive (pid))
+			ProcessUtils.Exec ("kill", "-9", pid.ToString (CultureInfo.InvariantCulture));
+	}
+
 	/// <summary>Makes a file executable.</summary>
 	public static void MakeExecutable (string path)
 	{

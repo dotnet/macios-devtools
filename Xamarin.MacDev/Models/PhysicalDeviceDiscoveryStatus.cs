@@ -17,7 +17,7 @@ namespace Xamarin.MacDev.Models {
 		/// <summary>The current host is not macOS, so devicectl cannot run. Nothing was executed.</summary>
 		UnsupportedHost,
 
-		/// <summary>xcrun or devicectl is not available (for example Xcode is missing, too old, or not selected).</summary>
+		/// <summary>xcrun or devicectl is not available (for example Xcode is missing, too old, not selected, or its license has not been accepted).</summary>
 		ToolUnavailable,
 
 		/// <summary>devicectl was started but reported a failure (a non-zero exit code, or an error in its output).</summary>

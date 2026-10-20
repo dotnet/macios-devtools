@@ -22,18 +22,24 @@ namespace Xamarin.MacDev {
 
 		readonly ICustomLogger log;
 		readonly string xcrunPath;
+		readonly string? developerRoot;
 
-		public DeviceCtl (ICustomLogger log, string? xcrunPath = null)
+		/// <param name="log">Receives all diagnostics.</param>
+		/// <param name="xcrunPath">The xcrun to run. Defaults to <c>/usr/bin/xcrun</c>.</param>
+		/// <param name="developerRoot">The Xcode developer directory xcrun should use, passed to the child process only as
+		/// <c>DEVELOPER_DIR</c>. <c>null</c>, empty or white space leaves the inherited environment alone.</param>
+		public DeviceCtl (ICustomLogger log, string? xcrunPath = null, string? developerRoot = null)
 		{
 			this.log = log ?? throw new ArgumentNullException (nameof (log));
 			this.xcrunPath = xcrunPath ?? SimCtl.XcrunPath;
+			this.developerRoot = string.IsNullOrWhiteSpace (developerRoot) ? null : developerRoot;
 		}
 
 		/// <summary>
 		/// Runs <c>xcrun devicectl list devices</c>. devicectl writes its machine-readable JSON to a temporary
 		/// file (<c>--json-output</c>) because its stdout is meant for humans and is not stable across releases.
 		/// The process is killed if <paramref name="cancellationToken"/> is cancelled (the net10.0 build also kills
-		/// any process it started), in which case an <see cref="OperationCanceledException"/> is thrown.
+		/// the processes it started that are still running), in which case an <see cref="OperationCanceledException"/> is thrown.
 		/// </summary>
 		public async Task<DeviceCtlRunResult> ListDevicesAsync (CancellationToken cancellationToken)
 		{
@@ -46,7 +52,9 @@ namespace Xamarin.MacDev {
 			try {
 				var arguments = new [] { "devicectl", "list", "devices", "--json-output", jsonPath };
 				var psi = ProcessUtils.CreateProcessStartInfo (xcrunPath, arguments);
-				log.LogInfo ("Running: {0} {1}", xcrunPath, string.Join (" ", arguments));
+				if (developerRoot is not null)
+					psi.EnvironmentVariables ["DEVELOPER_DIR"] = developerRoot;
+				log.LogInfo ("Running: {0}{1} {2}", developerRoot is null ? "" : $"DEVELOPER_DIR={developerRoot} ", xcrunPath, string.Join (" ", arguments));
 
 				using (var stdout = new StringWriter ())
 				using (var stderr = new StringWriter ()) {

@@ -485,6 +485,104 @@ public class DeviceCtlOutputParserTests {
 
 	#endregion
 
+	#region Values of an unexpected type
+
+	[TestCase ("\"12345\"")]
+	[TestCase ("true")]
+	[TestCase ("null")]
+	[TestCase ("{}")]
+	[TestCase ("[]")]
+	[TestCase ("1.5")]
+	[TestCase ("-1")]
+	public void ParseDevices_EcidThatIsNotAnUnsignedInteger_KeepsEveryDevice (string ecid)
+	{
+		// An optional value of the wrong type must neither fail the parse nor hide the devices that follow.
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", ""properties"": { ""hardware"": { ""ecid"": ECID, ""udid"": ""UDID-1"" } } },
+					{ ""identifier"": ""CD-2"", ""properties"": { ""hardware"": { ""ecid"": 42, ""udid"": ""UDID-2"" } } }
+				]
+			}
+		}".Replace ("ECID", ecid);
+
+		var devices = DeviceCtlOutputParser.ParseDevices (json);
+		var success = DeviceCtlOutputParser.TryParseDevices (json, out var strict, out var error);
+
+		Assert.That (devices.Select (d => d.Identifier), Is.EqualTo (new [] { "CD-1", "CD-2" }));
+		Assert.That (devices.Select (d => d.UniqueChipID), Is.EqualTo (new ulong? [] { null, 42 }));
+		Assert.That (success, Is.True, error);
+		Assert.That (strict.Select (d => d.UniqueChipID), Is.EqualTo (new ulong? [] { null, 42 }));
+	}
+
+	[Test]
+	public void ParseDevices_EcidThatIsNotANumberInTheFirstScope_UsesTheNextOne ()
+	{
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", ""properties"": { ""hardware"": { ""ecid"": ""oops"" }, ""ecid"": 7 } }
+				]
+			}
+		}";
+
+		Assert.That (DeviceCtlOutputParser.ParseDevices (json).Single ().UniqueChipID, Is.EqualTo ((ulong) 7));
+	}
+
+	[Test]
+	public void ParseDevices_CpuTypeWithValuesThatAreNotNumbers_KeepsEveryDevice ()
+	{
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", ""properties"": { ""hardware"": { ""cpuType"": { ""type"": ""arm64"" }, ""udid"": ""UDID-1"" } } },
+					{ ""identifier"": ""CD-2"", ""properties"": { ""hardware"": { ""cpuType"": { ""type"": null }, ""udid"": ""UDID-2"" } } },
+					{ ""identifier"": ""CD-3"", ""properties"": { ""hardware"": { ""cpuType"": { ""type"": 16777228, ""subtype"": ""2"" }, ""udid"": ""UDID-3"" } } },
+					{ ""identifier"": ""CD-4"", ""properties"": { ""hardware"": { ""cpuType"": { ""type"": 16777228, ""subtype"": 2 }, ""udid"": ""UDID-4"" } } }
+				]
+			}
+		}";
+
+		var devices = DeviceCtlOutputParser.ParseDevices (json);
+
+		Assert.That (devices.Select (d => d.Identifier), Is.EqualTo (new [] { "CD-1", "CD-2", "CD-3", "CD-4" }));
+		Assert.That (devices.Select (d => d.CpuArchitecture), Is.EqualTo (new [] { "", "", "arm64", "arm64e" }));
+		Assert.That (DeviceCtlOutputParser.TryParseDevices (json, out var strict, out var error), Is.True, error);
+		Assert.That (strict, Has.Count.EqualTo (4));
+	}
+
+	[Test]
+	public void ParseDevices_EntryWithoutAnIdentity_IsStillReturned ()
+	{
+		// dotnet/macios lists whatever devicectl reports, so only TryParseDevices validates the identity of an entry.
+		var devices = DeviceCtlOutputParser.ParseDevices ("{\"result\":{\"devices\":[{},{\"identifier\":\"CD-1\"}]}}");
+
+		Assert.That (devices.Select (d => d.Identifier), Is.EqualTo (new [] { "", "CD-1" }));
+	}
+
+	[Test]
+	public void Parsers_AcceptTrailingCommasAndComments ()
+	{
+		// devicectl output has to be accepted the way dotnet/macios already accepts it.
+		var json = @"{
+			// a comment
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", /* another one */ ""properties"": { ""hardware"": { ""udid"": ""UDID-1"", }, }, },
+				],
+			},
+		}";
+
+		var lenient = DeviceCtlOutputParser.ParseDevices (json);
+		var success = DeviceCtlOutputParser.TryParseDevices (json, out var strict, out var error);
+
+		Assert.That (lenient.Single ().HardwareUdid, Is.EqualTo ("UDID-1"));
+		Assert.That (success, Is.True, error);
+		Assert.That (strict.Single ().HardwareUdid, Is.EqualTo ("UDID-1"));
+	}
+
+	#endregion
+
 	#region TryParseDevices
 
 	[Test]
@@ -531,6 +629,7 @@ public class DeviceCtlOutputParserTests {
 	[TestCase ("{\"result\":{\"devices\":{}}}")]
 	[TestCase ("{\"result\":{\"devices\":[42]}}")]
 	[TestCase ("{\"result\":{\"devices\":[{\"identifier\":\"CD-1\"},\"oops\"]}}")]
+	[TestCase ("{\"result\":{\"devices\":[{\"identifier\":\"CD-1\"},{}]}}")]
 	public void TryParseDevices_OutputThatIsNotADeviceList_Fails (string json)
 	{
 		var success = DeviceCtlOutputParser.TryParseDevices (json, out var devices, out var error);
@@ -538,6 +637,53 @@ public class DeviceCtlOutputParserTests {
 		Assert.That (success, Is.False);
 		Assert.That (devices, Is.Empty, "A failed parse must not return partial results.");
 		Assert.That (error, Is.Not.Null.And.Not.Empty);
+	}
+
+	[TestCase ("{}")]
+	[TestCase ("{\"properties\":{\"hardware\":{\"udid\":\"UDID-1\"}}}")]
+	[TestCase ("{\"identifier\":null}")]
+	[TestCase ("{\"identifier\":\"\"}")]
+	[TestCase ("{\"identifier\":\"  \"}")]
+	[TestCase ("{\"identifier\":42}")]
+	[TestCase ("{\"identifier\":true}")]
+	[TestCase ("{\"identifier\":[\"CD-1\"]}")]
+	[TestCase ("{\"identifier\":{\"id\":\"CD-1\"}}")]
+	public void TryParseDevices_EntryWithoutATextIdentifier_Fails (string device)
+	{
+		var success = DeviceCtlOutputParser.TryParseDevices ("{\"result\":{\"devices\":[" + device + "]}}", out var devices, out var error);
+
+		Assert.That (success, Is.False);
+		Assert.That (devices, Is.Empty);
+		Assert.That (error, Does.Contain ("'identifier'"));
+	}
+
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"hardware\":{\"udid\":42}}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"hardware\":{\"udid\":[\"UDID-1\"]}}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"udid\":{\"id\":\"UDID-1\"}}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"hardwareProperties\":{\"udid\":true}}")]
+	public void TryParseDevices_EntryWithAHardwareUdidThatIsNotText_Fails (string device)
+	{
+		var success = DeviceCtlOutputParser.TryParseDevices ("{\"result\":{\"devices\":[" + device + "]}}", out var devices, out var error);
+
+		Assert.That (success, Is.False);
+		Assert.That (devices, Is.Empty);
+		Assert.That (error, Does.Contain ("'udid'"));
+	}
+
+	[TestCase ("{\"identifier\":\"CD-1\"}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"hardwareProperties\":{\"deviceType\":\"mac\",\"platform\":\"macOS\"}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"hardware\":{\"udid\":null}}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"hardware\":{\"udid\":\"\"}}}")]
+	public void TryParseDevices_EntryWithAnIdentifierAndNoHardwareUdid_Succeeds (string device)
+	{
+		// Some hardware (a Mac, for example) has no UDID in devicectl's output; the CoreDevice identifier is all it has.
+		var success = DeviceCtlOutputParser.TryParseDevices ("{\"result\":{\"devices\":[" + device + "]}}", out var devices, out var error);
+
+		Assert.That (success, Is.True, error);
+		var parsed = devices.Single ();
+		Assert.That (parsed.Identifier, Is.EqualTo ("CD-1"));
+		Assert.That (parsed.HasHardwareUdid, Is.False);
+		Assert.That (parsed.Udid, Is.EqualTo ("CD-1"));
 	}
 
 	#endregion

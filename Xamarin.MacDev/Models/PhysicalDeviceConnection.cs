@@ -19,7 +19,10 @@ namespace Xamarin.MacDev.Models {
 		/// <summary>The raw transport type (e.g. "wired", "localNetwork"). Empty if not reported.</summary>
 		public string TransportType { get; set; } = "";
 
-		/// <summary>The raw pairing state (e.g. "paired"). Empty if not reported.</summary>
+		/// <summary>
+		/// The raw pairing state (e.g. "paired") that this entry reported. Empty if not reported, even when
+		/// <see cref="PhysicalDeviceInfo.PairingState"/> of the merged device was filled in from another entry.
+		/// </summary>
 		public string PairingState { get; set; } = "";
 
 		/// <summary>The raw connection (tunnel) state: "connected", "disconnected" or "unavailable". Empty if not reported.</summary>

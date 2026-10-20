@@ -41,6 +41,13 @@ public class DeviceCtlTests {
 	[TearDown]
 	public void TearDown ()
 	{
+		// A failed assertion must not leave the fake xcrun or the process it started running for a minute.
+		foreach (var name in new [] { "sh.pid", "child.pid" }) {
+			var pid = ProcessTestHelper.TryReadPid (InDirectory (name));
+			if (pid.HasValue)
+				ProcessTestHelper.Kill (pid.Value);
+		}
+
 		try {
 			Directory.Delete (directory, recursive: true);
 		} catch (IOException) {
@@ -94,6 +101,11 @@ public class DeviceCtlTests {
 		"echo $! > \"$dir/child.pid\"",
 		"echo $$ > \"$dir/sh.pid\"",
 		"wait");
+
+	/// <summary>A fake xcrun that records the <c>DEVELOPER_DIR</c> it was started with, or <c>unset</c>.</summary>
+	void WriteXcrunThatRecordsTheDeveloperDir () => WriteXcrun (
+		"printf '%s' \"${DEVELOPER_DIR-unset}\" > \"$dir/developer-dir.txt\"",
+		"exit 0");
 
 	string ReadRecorded (string name) => File.ReadAllText (InDirectory (name));
 
@@ -231,6 +243,60 @@ public class DeviceCtlTests {
 
 		Assert.That (log.Messages, Has.Some.Contain ("devicectl list devices --json-output"));
 		Assert.That (log.Warnings, Is.Empty);
+	}
+
+	#endregion
+
+	#region Developer root
+
+	const string DeveloperRoot = "/Applications/Xcode-Test.app/Contents/Developer";
+
+	[Test]
+	[Platform (Exclude = "Win")]
+	public async Task ListDevicesAsync_DeveloperRoot_IsPassedToTheProcessAsDeveloperDir ()
+	{
+		WriteXcrunThatRecordsTheDeveloperDir ();
+
+		await new DeviceCtl (log, xcrun, DeveloperRoot).ListDevicesAsync (CancellationToken.None);
+
+		Assert.That (ReadRecorded ("developer-dir.txt"), Is.EqualTo (DeveloperRoot));
+	}
+
+	[Test]
+	[Platform (Exclude = "Win")]
+	public async Task ListDevicesAsync_DeveloperRoot_DoesNotChangeTheEnvironmentOfTheCurrentProcess ()
+	{
+		var before = Environment.GetEnvironmentVariable ("DEVELOPER_DIR");
+		WriteXcrunThatRecordsTheDeveloperDir ();
+
+		await new DeviceCtl (log, xcrun, DeveloperRoot).ListDevicesAsync (CancellationToken.None);
+
+		Assert.That (Environment.GetEnvironmentVariable ("DEVELOPER_DIR"), Is.EqualTo (before));
+	}
+
+	[Test]
+	[Platform (Exclude = "Win")]
+	public async Task ListDevicesAsync_DeveloperRoot_IsLoggedWithTheCommand ()
+	{
+		WriteXcrunThatRecordsTheDeveloperDir ();
+
+		await new DeviceCtl (log, xcrun, DeveloperRoot).ListDevicesAsync (CancellationToken.None);
+
+		Assert.That (log.Messages, Has.Some.StartWith ($"Running: DEVELOPER_DIR={DeveloperRoot} {xcrun} devicectl list devices --json-output "));
+	}
+
+	[TestCase (null)]
+	[TestCase ("")]
+	[TestCase ("   ")]
+	[Platform (Exclude = "Win")]
+	public async Task ListDevicesAsync_NoDeveloperRoot_InheritsTheEnvironment (string? developerRoot)
+	{
+		WriteXcrunThatRecordsTheDeveloperDir ();
+
+		await new DeviceCtl (log, xcrun, developerRoot).ListDevicesAsync (CancellationToken.None);
+
+		Assert.That (ReadRecorded ("developer-dir.txt"), Is.EqualTo (Environment.GetEnvironmentVariable ("DEVELOPER_DIR") ?? "unset"));
+		Assert.That (log.Messages, Has.None.Contain ("DEVELOPER_DIR="));
 	}
 
 	#endregion
