@@ -105,9 +105,9 @@ public class MaciosParityTests {
 			Assert.That (task.Devices [2].Status, Is.EqualTo ("Paired"), "Device 3 Status mismatch.");
 			Assert.That (task.Devices [2].DiscardedReason, Is.Empty, "Device 3 discarded reason mismatch.");
 
-			// The apostrophe of this device name is U+2019, not the ASCII one of the other names.
+			// The apostrophe of this device name is U+2019, not the ASCII one of the other names, and a non-breaking space (U+00A0) separates "Apple" and "Watch".
 			Assert.That (task.DiscardedDevices [0].ItemSpec, Is.EqualTo ("00008004-012301230123ABCD"), "Discarded Device 1 ItemSpec mismatch.");
-			Assert.That (task.DiscardedDevices [0].Description, Is.EqualTo ("Rolf\u2019s Apple Watch Series 7 - watchOS 11.5"), "Discarded Device 1 Description mismatch.");
+			Assert.That (task.DiscardedDevices [0].Description, Is.EqualTo ("Rolf\u2019s Apple\u00a0Watch Series 7 - watchOS 11.5"), "Discarded Device 1 Description mismatch.");
 			Assert.That (task.DiscardedDevices [0].OSVersion, Is.EqualTo ("11.5"), "Discarded Device 1 OSVersion mismatch.");
 			Assert.That (task.DiscardedDevices [0].Udid, Is.EqualTo ("00008004-012301230123ABCD"), "Discarded Device 1 UDID mismatch.");
 			Assert.That (task.DiscardedDevices [0].RuntimeIdentifier, Is.EqualTo (""), "Discarded Device 1 RuntimeIdentifier mismatch.");

@@ -130,9 +130,9 @@ static class MaciosDeviceMapping {
 
 		var kept = items
 			.Where (i => !i.Discarded)
-			.OrderByDescending (i => i.MinimumOSVersion) // newer devices first
-			.ThenBy (i => i.Name, StringComparer.Ordinal)
-			.ThenBy (i => i.Udid, StringComparer.Ordinal)
+			.OrderByDescending (i => i.MinimumOSVersion) // newer devices first (probably has duplicates)
+			.ThenBy (i => i.Name) // then sort by name (may have duplicates)
+			.ThenBy (i => i.Udid) // and finally by UDID, which should be unique
 			.ToList ();
 
 		return new Result (kept, items.Where (i => i.Discarded).ToList ());

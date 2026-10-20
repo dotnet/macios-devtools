@@ -159,6 +159,8 @@ namespace Xamarin.MacDev {
 		/// The default implementation returns <see cref="DeviceCtlRunResult.UnsupportedHost"/> without running anything on any host
 		/// other than macOS. An override that returns canned output is not subject to that, so it works on every host.
 		/// Exceptions other than <see cref="OperationCanceledException"/> are not caught: they surface from <see cref="ListAsync(TimeSpan, CancellationToken)"/>.
+		/// An implementation must return its task promptly and do any waiting asynchronously. The timeout and the grace period
+		/// bound the task that is returned, not a call that blocks the calling thread before it returns one.
 		/// </remarks>
 		protected virtual Task<DeviceCtlRunResult> ExecuteDeviceCtlAsync (CancellationToken cancellationToken)
 		{
@@ -198,7 +200,7 @@ namespace Xamarin.MacDev {
 				return Fail (PhysicalDeviceDiscoveryStatus.UnsupportedHost, "Physical device discovery requires macOS with Xcode installed (it runs 'xcrun devicectl').");
 
 			if (run.ToolNotFound)
-				return Fail (PhysicalDeviceDiscoveryStatus.ToolUnavailable, run.Message);
+				return Fail (PhysicalDeviceDiscoveryStatus.ToolUnavailable, string.IsNullOrWhiteSpace (run.Message) ? "xcrun could not be started." : run.Message);
 
 			var stderr = run.StdErr.Trim ();
 

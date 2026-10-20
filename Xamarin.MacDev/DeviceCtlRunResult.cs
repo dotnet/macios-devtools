@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
+
 #nullable enable
 
 namespace Xamarin.MacDev {
@@ -46,7 +48,8 @@ namespace Xamarin.MacDev {
 
 		/// <summary>The outcome when xcrun does not exist or could not be started.</summary>
 		/// <param name="message">Why xcrun could not be started.</param>
-		public static DeviceCtlRunResult NotFound (string message) => new DeviceCtlRunResult (true, false, message, -1, null, null, null);
+		/// <exception cref="ArgumentNullException"><paramref name="message"/> is <c>null</c>.</exception>
+		public static DeviceCtlRunResult NotFound (string message) => new DeviceCtlRunResult (true, false, message ?? throw new ArgumentNullException (nameof (message)), -1, null, null, null);
 
 		/// <summary>The outcome when the host is not macOS, so devicectl cannot run.</summary>
 		public static DeviceCtlRunResult UnsupportedHost () => new DeviceCtlRunResult (false, true, "", -1, null, null, null);

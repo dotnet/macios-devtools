@@ -9,15 +9,21 @@ namespace tests;
 /// The devicectl documents the dotnet/macios <c>GetAvailableDevicesTests</c> use, copied from
 /// <c>tests/msbuild/Xamarin.MacDev.Tasks.Tests/TaskTests/GetAvailableDevicesTest.cs</c> in https://github.com/dotnet/macios
 /// (MIT licensed), so that the same inputs are checked here. The comments give the names they have there.
+/// They are identical to the originals, except that the non-breaking spaces of <see cref="DeviceCtlJson1"/> are written as an escape.
 /// The UDIDs, identifiers and serial numbers are made up.
 /// </summary>
 static class MaciosDeviceCtlFixtures {
 
 	/// <summary>
 	/// <c>DEVICECTL_JSON_1</c>: four devices in the JSON version 2 layout of Xcode 26 (an iPad, two iPhones and an Apple Watch).
-	/// It contains trailing commas, which strict JSON parsers reject.
+	/// It contains trailing commas, which strict JSON parsers reject. The name and the marketing name of the Apple Watch have a
+	/// non-breaking space (U+00A0) between "Apple" and "Watch", as they do in the original.
 	/// </summary>
-	public const string DeviceCtlJson1 =
+	public static readonly string DeviceCtlJson1 = DeviceCtlJson1Source.Replace ("Apple Watch Series 7", "Apple\u00a0Watch Series 7");
+
+	// The original has those non-breaking spaces in the text itself. An editor or a tool can silently turn such a character into a
+	// plain space, so they are written as an escape and put in above.
+	const string DeviceCtlJson1Source =
 	"""
 	{
 	"info" : {

@@ -109,6 +109,18 @@ public class PhysicalDeviceServiceFailureTests {
 		Assert.That (result.ExitCode, Is.Null);
 	}
 
+	[TestCase ("")]
+	[TestCase ("   ")]
+	public async Task ListAsync_ToolNotFoundWithABlankMessage_StillExplainsTheFailure (string message)
+	{
+		var service = CreateService (log, Returns (DeviceCtlRunResult.NotFound (message)));
+
+		var result = await service.ListAsync ();
+
+		AssertFailure (result, PhysicalDeviceDiscoveryStatus.ToolUnavailable);
+		Assert.That (result.ErrorMessage, Does.Contain ("xcrun"), "A failure must say what went wrong, even when the runner did not.");
+	}
+
 	[TestCase (72, "xcrun: error: unable to find utility \"devicectl\", not a developer tool or in PATH")]
 	[TestCase (1, "xcrun: error: invalid active developer path (/Library/Developer/CommandLineTools), missing xcrun at: /Library/Developer/CommandLineTools/usr/bin/xcrun")]
 	[TestCase (1, "xcrun: error: missing DEVELOPER_DIR path: /nonexistent")]

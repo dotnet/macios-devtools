@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using NUnit.Framework;
 using Xamarin.MacDev;
 
@@ -29,6 +30,14 @@ public class DeviceCtlRunResultTests {
 			Assert.That (result.StdErr, Is.Empty);
 			Assert.That (result.Json, Is.Null);
 		});
+	}
+
+	[Test]
+	public void NotFound_WithoutAMessage_Throws ()
+	{
+		var exception = Assert.Throws<ArgumentNullException> (() => DeviceCtlRunResult.NotFound (null!));
+
+		Assert.That (exception.ParamName, Is.EqualTo ("message"));
 	}
 
 	[Test]
