@@ -152,7 +152,7 @@ namespace Xamarin.MacDev {
 			}
 		}
 
-		static ProcessStartInfo CreateProcessStartInfo (string executable, string [] arguments)
+		internal static ProcessStartInfo CreateProcessStartInfo (string executable, string [] arguments)
 		{
 			var psi = new ProcessStartInfo (executable) {
 				CreateNoWindow = true,
@@ -195,12 +195,22 @@ namespace Xamarin.MacDev {
 		static void KillProcess (Process p)
 		{
 			try {
+#if NET
+				// Also terminate processes started by the child so cancellation does not leave orphans behind.
+				p.Kill (entireProcessTree: true);
+#else
 				p.Kill ();
+#endif
 			} catch (InvalidOperationException) {
 				// Process may have already exited
 			} catch (System.ComponentModel.Win32Exception) {
 				// Process cannot be terminated (e.g. access denied)
 			}
+#if NET
+			catch (AggregateException) {
+				// Some processes in the tree could not be terminated
+			}
+#endif
 		}
 
 		static async Task ReadStreamAsync (StreamReader stream, TextWriter destination)
