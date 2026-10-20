@@ -453,13 +453,9 @@ public class PhysicalDeviceServiceFailureTests {
 	[Test]
 	public void Constructor_NullArguments_Throw ()
 	{
-		var runner = ReturnsJson (Document ());
-
 		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (null!));
 		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (null!, "/Applications/Xcode.app/Contents/Developer"));
-		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (null!, runner, () => true, ShortGracePeriod));
-		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (log, null!, () => true, ShortGracePeriod));
-		Assert.Throws<ArgumentNullException> (() => new PhysicalDeviceService (log, runner, null!, ShortGracePeriod));
+		Assert.Throws<ArgumentNullException> (() => CreateService (null!, ReturnsJson (Document ())));
 	}
 
 	[TestCase (null)]

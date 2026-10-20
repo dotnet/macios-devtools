@@ -22,6 +22,75 @@ static class DeviceCtlFixtures {
 	public const string IPadIdentifier = "22222222-AAAA-BBBB-CCCC-222222222222";
 	public const string WatchIdentifier = "33333333-AAAA-BBBB-CCCC-333333333333";
 
+	public const string LegacyIPadIdentifier = "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB";
+
+	/// <summary>
+	/// What Xcode 27 (devicectl 642.16, JSON version 5) writes for an iPad that CoreDevice cannot manage (an iPad Pro 9.7-inch,
+	/// which cannot run iPadOS 17): the device is listed, but with few properties, and without a name, UDID, operating system or CPU.
+	/// It has the <c>properties</c> object as well as the deprecated properties it replaces. The identifiers are made up.
+	/// </summary>
+	public const string LegacyIPadDocument =
+	"""
+	{
+		"info": {
+			"arguments": [ "devicectl", "list", "devices", "--json-output", "devices.json" ],
+			"commandType": "devicectl.list.devices",
+			"environment": {},
+			"jsonVersion": 5,
+			"outcome": "success",
+			"version": "642.16"
+		},
+		"result": {
+			"devices": [
+				{
+					"_deprecationNotice": {
+						"deprecatedFields": [ "hardwareProperties", "deviceProperties", "connectionProperties" ],
+						"message": "The 'hardwareProperties', 'deviceProperties', 'connectionProperties' fields are deprecated and will be removed in a future release. Use the 'properties' dictionary instead.",
+						"replacement": "properties"
+					},
+					"capabilities": [],
+					"connectionProperties": {
+						"isMobileDeviceOnly": false,
+						"pairingState": "unsupported",
+						"potentialHostnames": [ "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB.coredevice.local" ],
+						"tunnelState": "unavailable"
+					},
+					"deviceProperties": {
+						"bootState": "booted",
+						"ddiServicesAvailable": false
+					},
+					"hardwareProperties": {
+						"deviceType": "iPad",
+						"ecid": 1234567890123456,
+						"isProductionFused": true,
+						"platform": "iOS",
+						"productType": "iPad6,3",
+						"serialNumber": "SERIAL_LEGACY"
+					},
+					"identifier": "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB",
+					"properties": {
+						"connection": {
+							"pairingState": "unsupported"
+						},
+						"hardware": {
+							"deviceType": "iPad",
+							"ecid": 1234567890123456,
+							"platform": "iOS",
+							"productType": "iPad6,3",
+							"serialNumber": "SERIAL_LEGACY"
+						},
+						"state": {
+							"bootState": "booted"
+						}
+					},
+					"propertyDisplayNames": null,
+					"visibilityClass": "default"
+				}
+			]
+		}
+	}
+	""";
+
 	/// <summary>A devicectl document (JSON version 5) containing the given device entries.</summary>
 	public static string Document (params string [] devices) => Wrap (5, devices);
 

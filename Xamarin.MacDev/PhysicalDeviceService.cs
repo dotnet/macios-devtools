@@ -31,8 +31,10 @@ namespace Xamarin.MacDev {
 	/// Line Tools, and Xcode 15 requires macOS 13.5 or later). By default the Xcode that the environment selects
 	/// (<c>DEVELOPER_DIR</c> or <c>xcode-select</c>) is used; to use a specific one, pass its developer directory to the
 	/// constructor. devicectl manages devices through CoreDevice, which targets iOS and iPadOS 17, tvOS 17, watchOS 10
-	/// and visionOS devices; devices running older operating systems may be missing from the list. On any other host,
-	/// discovery returns <see cref="PhysicalDeviceDiscoveryStatus.UnsupportedHost"/> without running anything.
+	/// and visionOS devices; devices CoreDevice cannot manage, such as ones running older operating systems, may be missing
+	/// from the list or listed with little information (for example no name, OS version or hardware UDID, and a pairing
+	/// state of <c>unsupported</c>). On any other host, discovery returns
+	/// <see cref="PhysicalDeviceDiscoveryStatus.UnsupportedHost"/> without running anything.
 	/// </para>
 	/// <para>
 	/// Discovery is read-only: it never pairs with, trusts, connects to or modifies a device.
@@ -41,8 +43,8 @@ namespace Xamarin.MacDev {
 	/// The result contains every physical device CoreDevice knows about, including remembered devices that are
 	/// currently not reachable; use <see cref="PhysicalDeviceInfo.Availability"/> to tell them apart.
 	/// Simulators, which newer Xcode versions also list in devicectl, are excluded; use
-	/// <see cref="SimulatorService"/> for those. The same device is often reported once per connection
-	/// (for example over USB and over the network). Those reports are merged into a single
+	/// <see cref="SimulatorService"/> for those. If devicectl reports the same device more than once (for example
+	/// once per connection path, such as over USB and over the network), those reports are merged into a single
 	/// <see cref="PhysicalDeviceInfo"/>, correlated by <see cref="PhysicalDeviceInfo.HardwareUdid"/>, with each
 	/// transport listed in <see cref="PhysicalDeviceInfo.Connections"/>. Devices for which devicectl reports no
 	/// hardware UDID cannot be correlated and are never merged (see <see cref="PhysicalDeviceInfo.HasHardwareUdid"/>).
@@ -51,6 +53,10 @@ namespace Xamarin.MacDev {
 	/// All diagnostics go to the <see cref="ICustomLogger"/>; nothing is written to stdout. A failed discovery is
 	/// logged at info level because it is already reported in the result; only an abnormal condition (a devicectl runner
 	/// that does not stop when cancelled) is logged as a warning.
+	/// </para>
+	/// <para>
+	/// To test code that uses this service without Xcode or a device, derive from it and override
+	/// <see cref="ExecuteDeviceCtlAsync"/> to return canned devicectl output.
 	/// </para>
 	/// </remarks>
 	public class PhysicalDeviceService {
@@ -62,8 +68,7 @@ namespace Xamarin.MacDev {
 		static readonly TimeSpan DefaultGracePeriod = TimeSpan.FromSeconds (5);
 
 		readonly ICustomLogger log;
-		readonly Func<CancellationToken, Task<DeviceCtlRunResult>> runner;
-		readonly Func<bool> isSupportedHost;
+		readonly DeviceCtl deviceCtl;
 		readonly TimeSpan gracePeriod;
 
 		/// <summary>Creates a service that runs <c>xcrun devicectl</c> on the current host, with the Xcode the environment selects.</summary>
@@ -83,15 +88,14 @@ namespace Xamarin.MacDev {
 		/// be used concurrently. <c>null</c>, empty or white space uses the Xcode the environment selects.
 		/// A directory that does not exist or is not an Xcode results in <see cref="PhysicalDeviceDiscoveryStatus.ToolUnavailable"/>.</param>
 		public PhysicalDeviceService (ICustomLogger log, string? developerRoot)
-			: this (log, new DeviceCtl (log ?? throw new ArgumentNullException (nameof (log)), developerRoot: developerRoot).ListDevicesAsync, () => IsSupportedHost, DefaultGracePeriod)
+			: this (log, developerRoot, DefaultGracePeriod)
 		{
 		}
 
-		internal PhysicalDeviceService (ICustomLogger log, Func<CancellationToken, Task<DeviceCtlRunResult>> runner, Func<bool> isSupportedHost, TimeSpan gracePeriod)
+		internal PhysicalDeviceService (ICustomLogger log, string? developerRoot, TimeSpan gracePeriod)
 		{
 			this.log = log ?? throw new ArgumentNullException (nameof (log));
-			this.runner = runner ?? throw new ArgumentNullException (nameof (runner));
-			this.isSupportedHost = isSupportedHost ?? throw new ArgumentNullException (nameof (isSupportedHost));
+			this.deviceCtl = new DeviceCtl (log, developerRoot: developerRoot);
 			this.gracePeriod = gracePeriod;
 		}
 
@@ -127,9 +131,6 @@ namespace Xamarin.MacDev {
 
 			cancellationToken.ThrowIfCancellationRequested ();
 
-			if (!isSupportedHost ())
-				return Fail (PhysicalDeviceDiscoveryStatus.UnsupportedHost, "Physical device discovery requires macOS with Xcode installed (it runs 'xcrun devicectl').");
-
 			DeviceCtlRunResult run;
 			using (var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource (cancellationToken)) {
 				timeoutSource.CancelAfter (timeout);
@@ -145,11 +146,33 @@ namespace Xamarin.MacDev {
 			return CreateResult (run);
 		}
 
+		/// <summary>
+		/// Runs <c>xcrun devicectl list devices</c> and returns what it produced, without interpreting it. It is the only place
+		/// <see cref="ListAsync(TimeSpan, CancellationToken)"/> starts a process, so code that uses this service can be tested
+		/// without Xcode or a device by deriving from <see cref="PhysicalDeviceService"/> and returning canned output from here,
+		/// the way the dotnet/macios tests override <c>ExecuteCtlAsync</c>. For example,
+		/// <c>Task.FromResult (DeviceCtlRunResult.FromJson (json))</c>.
+		/// </summary>
+		/// <param name="cancellationToken">Cancelled when the caller cancels or the timeout elapses. An implementation that waits for
+		/// something should stop promptly and throw <see cref="OperationCanceledException"/>; one that does not is abandoned after a short grace period.</param>
+		/// <remarks>
+		/// The default implementation returns <see cref="DeviceCtlRunResult.UnsupportedHost"/> without running anything on any host
+		/// other than macOS. An override that returns canned output is not subject to that, so it works on every host.
+		/// Exceptions other than <see cref="OperationCanceledException"/> are not caught: they surface from <see cref="ListAsync(TimeSpan, CancellationToken)"/>.
+		/// </remarks>
+		protected virtual Task<DeviceCtlRunResult> ExecuteDeviceCtlAsync (CancellationToken cancellationToken)
+		{
+			if (!IsSupportedHost)
+				return Task.FromResult (DeviceCtlRunResult.UnsupportedHost ());
+
+			return deviceCtl.ListDevicesAsync (cancellationToken);
+		}
+
 		// The runner is expected to stop promptly when cancelled. Should it not, give it a short grace period and
 		// then stop waiting for it, so that a hung runner can never block the caller beyond the requested timeout.
 		async Task<DeviceCtlRunResult> RunBoundedAsync (CancellationToken token)
 		{
-			var run = runner (token);
+			var run = ExecuteDeviceCtlAsync (token);
 
 			var cancelled = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
 			using (token.Register (() => cancelled.TrySetResult (true))) {
@@ -171,6 +194,9 @@ namespace Xamarin.MacDev {
 
 		PhysicalDeviceDiscoveryResult CreateResult (DeviceCtlRunResult run)
 		{
+			if (run.HostNotSupported)
+				return Fail (PhysicalDeviceDiscoveryStatus.UnsupportedHost, "Physical device discovery requires macOS with Xcode installed (it runs 'xcrun devicectl').");
+
 			if (run.ToolNotFound)
 				return Fail (PhysicalDeviceDiscoveryStatus.ToolUnavailable, run.Message);
 

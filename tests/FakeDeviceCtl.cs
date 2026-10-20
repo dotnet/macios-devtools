@@ -16,8 +16,13 @@ static class FakeDeviceCtl {
 	/// <summary>A short grace period, so tests with a runner that ignores cancellation stay fast.</summary>
 	public static readonly TimeSpan ShortGracePeriod = TimeSpan.FromMilliseconds (100);
 
+	/// <summary>
+	/// A service whose devicectl is the given runner, the way code that uses the service fakes it by overriding
+	/// <see cref="PhysicalDeviceService.ExecuteDeviceCtlAsync"/>. A host that is not <paramref name="supportedHost"/> gets
+	/// what the real service returns there, and the runner is not invoked.
+	/// </summary>
 	public static PhysicalDeviceService CreateService (ICustomLogger log, Func<CancellationToken, Task<DeviceCtlRunResult>> runner, bool supportedHost = true, TimeSpan? gracePeriod = null)
-		=> new PhysicalDeviceService (log, runner, () => supportedHost, gracePeriod ?? ShortGracePeriod);
+		=> new RunnerBackedService (log, runner, supportedHost, gracePeriod ?? ShortGracePeriod);
 
 	public static Func<CancellationToken, Task<DeviceCtlRunResult>> Returns (DeviceCtlRunResult result) => _ => Task.FromResult (result);
 
@@ -30,5 +35,21 @@ static class FakeDeviceCtl {
 	{
 		await Task.Delay (Timeout.Infinite, token).ConfigureAwait (false);
 		return DeviceCtlRunResult.NotFound ("The runner was not cancelled.");
+	}
+
+	sealed class RunnerBackedService : PhysicalDeviceService {
+
+		readonly Func<CancellationToken, Task<DeviceCtlRunResult>> runner;
+		readonly bool supportedHost;
+
+		public RunnerBackedService (ICustomLogger log, Func<CancellationToken, Task<DeviceCtlRunResult>> runner, bool supportedHost, TimeSpan gracePeriod)
+			: base (log, developerRoot: null, gracePeriod)
+		{
+			this.runner = runner;
+			this.supportedHost = supportedHost;
+		}
+
+		protected override Task<DeviceCtlRunResult> ExecuteDeviceCtlAsync (CancellationToken cancellationToken)
+			=> supportedHost ? runner (cancellationToken) : Task.FromResult (DeviceCtlRunResult.UnsupportedHost ());
 	}
 }

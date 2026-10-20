@@ -9,8 +9,9 @@ namespace Xamarin.MacDev.Models {
 
 	/// <summary>
 	/// One way a physical device is (or was) reachable, as reported by a single devicectl entry.
-	/// A device that is attached over USB and also visible on the local network is reported
-	/// once per transport; see <see cref="PhysicalDeviceInfo.Connections"/>.
+	/// If devicectl reports a device that is attached over USB and also visible on the local network
+	/// once per transport, each entry becomes one connection of a single device;
+	/// see <see cref="PhysicalDeviceInfo.Connections"/>.
 	/// </summary>
 	public class PhysicalDeviceConnection {
 		/// <summary>The CoreDevice identifier of the devicectl entry that reported this connection.</summary>
