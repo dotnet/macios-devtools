@@ -70,6 +70,11 @@ public static class DeviceCtlOutputParser {
 	/// Every entry must have a text <c>identifier</c>, and a text hardware <c>udid</c> if it has one;
 	/// an entry that does not makes the whole output invalid rather than becoming a device nobody can address.
 	/// </summary>
+	/// <remarks>
+	/// Only the structure of the output is validated, not whether the command succeeded: devicectl signals a failure
+	/// with a non-zero exit code and, when it writes JSON, a top-level <c>error</c> object. This method looks at neither.
+	/// <see cref="PhysicalDeviceService"/> checks both before it accepts a device list.
+	/// </remarks>
 	/// <param name="json">The contents of the devicectl JSON output.</param>
 	/// <param name="devices">All parsed entries in the order devicectl reported them, including simulators and
 	/// repeated reports of the same device. Empty if parsing failed.</param>

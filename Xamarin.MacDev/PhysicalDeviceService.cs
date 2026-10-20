@@ -216,12 +216,14 @@ namespace Xamarin.MacDev {
 				return Fail (PhysicalDeviceDiscoveryStatus.ExecutionFailed, message!, run.ExitCode);
 			}
 
-			if (!DeviceCtlOutputParser.TryParseDevices (run.Json, out var entries, out var parseError)) {
-				var reported = DeviceCtlOutputParser.GetErrorMessage (run.Json);
-				return reported is not null
-					? Fail (PhysicalDeviceDiscoveryStatus.ExecutionFailed, reported, run.ExitCode)
-					: Fail (PhysicalDeviceDiscoveryStatus.InvalidOutput, parseError, run.ExitCode);
-			}
+			// devicectl reports a failure as an error object. A document that has one is a failure even when the process
+			// exited with code 0, and a device list next to it must not be mistaken for the result of a successful run.
+			var reported = DeviceCtlOutputParser.GetErrorMessage (run.Json);
+			if (reported is not null)
+				return Fail (PhysicalDeviceDiscoveryStatus.ExecutionFailed, reported, run.ExitCode);
+
+			if (!DeviceCtlOutputParser.TryParseDevices (run.Json, out var entries, out var parseError))
+				return Fail (PhysicalDeviceDiscoveryStatus.InvalidOutput, parseError, run.ExitCode);
 
 			var physical = entries.Where (d => !d.IsSimulated).ToList ();
 			var devices = MergeByHardwareUdid (physical);

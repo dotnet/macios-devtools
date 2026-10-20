@@ -225,6 +225,36 @@ public class PhysicalDeviceServiceFailureTests {
 		Assert.That (result.ExitCode, Is.EqualTo (0));
 	}
 
+	[TestCase (0)]
+	[TestCase (2)]
+	public async Task ListAsync_ErrorNextToADeviceListWithExitCodeZero_ReturnsExecutionFailedWithoutDevices (int deviceCount)
+	{
+		var devices = Enumerable.Range (1, deviceCount).Select (i => Device ($"CD-{i}", udid: $"UDID-{i}")).ToArray ();
+		var service = CreateService (log, ReturnsJson (ErrorDocumentWithDevices ("Operation failed.", devices), exitCode: 0));
+
+		var result = await service.ListAsync ();
+
+		AssertFailure (result, PhysicalDeviceDiscoveryStatus.ExecutionFailed);
+		Assert.That (result.ErrorMessage, Is.EqualTo ("Operation failed."));
+		Assert.That (result.ExitCode, Is.EqualTo (0));
+	}
+
+	// The smallest documents that carry an error: without 'info' and without a description, so that neither
+	// an outcome nor a message is what makes them a failure.
+	[TestCase ("{\"error\":{\"code\":1000},\"result\":{\"devices\":[]}}", "devicectl error 1000")]
+	[TestCase ("{\"error\":{},\"result\":{\"devices\":[]}}", "devicectl reported an error.")]
+	[TestCase ("{\"error\":{\"code\":1000},\"result\":{\"devices\":[{\"identifier\":\"CD-1\"}]}}", "devicectl error 1000")]
+	public async Task ListAsync_BareErrorNextToADeviceListWithExitCodeZero_ReturnsExecutionFailed (string json, string expectedMessage)
+	{
+		var service = CreateService (log, ReturnsJson (json, exitCode: 0));
+
+		var result = await service.ListAsync ();
+
+		AssertFailure (result, PhysicalDeviceDiscoveryStatus.ExecutionFailed);
+		Assert.That (result.ErrorMessage, Is.EqualTo (expectedMessage));
+		Assert.That (result.ExitCode, Is.EqualTo (0));
+	}
+
 	#endregion
 
 	#region Invalid output

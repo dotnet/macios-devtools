@@ -67,7 +67,7 @@ Only invalid arguments (`ArgumentOutOfRangeException` for a non-positive timeout
 - Discovery is read-only. It only runs `devicectl list devices`; it never pairs with, trusts, connects to or modifies a device. devicectl writes its JSON output to a temporary file (`--json-output`) that is deleted afterwards.
 - `ListAsync` waits at most `PhysicalDeviceService.DefaultTimeout` (30 seconds). Use `ListAsync (TimeSpan, CancellationToken)` for another limit. When the timeout elapses, or the `CancellationToken` is cancelled, devicectl is terminated (the `net10.0` build of the library also terminates the processes devicectl started that are still running). The call never waits longer than the timeout plus a short grace period, even for a runner that ignores cancellation, as long as it returns its task promptly instead of blocking the calling thread.
 - Diagnostics are written to the `ICustomLogger` passed to the constructor. The service never writes to stdout. A failed discovery is logged at info level because the result already carries it, and a logger that turns warnings into build warnings (as MSBuild tasks do) should not fail a build over a missing Xcode; only a devicectl runner that does not stop when cancelled is logged as a warning.
-- `DeviceCtlOutputParser.ParseDevices` stays lenient: it returns every entry, including simulators and entries without an identity, and keeps the `Udid` fallback. `DeviceCtlOutputParser.TryParseDevices` is its strict counterpart and reports output that is not a valid devicectl device list, including an entry without a text `identifier`.
+- `DeviceCtlOutputParser.ParseDevices` stays lenient: it returns every entry, including simulators and entries without an identity, and keeps the `Udid` fallback. `DeviceCtlOutputParser.TryParseDevices` is its strict counterpart and reports output that is not a valid devicectl device list, including an entry without a text `identifier`. It validates the document, not the run: devicectl signals a failure with a non-zero exit code and, in its JSON, an `error` object, and `ListAsync` checks both before it accepts a device list.
 
 ### Testing code that uses the service
 
@@ -92,7 +92,7 @@ The service interprets the canned output exactly as it does real output, so ever
 
 | Factory | Simulates | Resulting `Status` |
 | --- | --- | --- |
-| `FromJson (json)` | devicectl exited with code 0 after writing `json` | `Success`; `InvalidOutput` if `json` is not a device list, or `ExecutionFailed` if it is a devicectl error report |
+| `FromJson (json)` | devicectl exited with code 0 after writing `json` | `Success`; `InvalidOutput` if `json` is not a device list, or `ExecutionFailed` if it contains a devicectl error report |
 | `Completed (exitCode, stdout, stderr, json)` | devicectl ran to completion with any exit code and output | `Success`, `ExecutionFailed`, `ToolUnavailable` (for xcrun's own failures) or `InvalidOutput` |
 | `NotFound (message)` | `xcrun` could not be started | `ToolUnavailable` |
 | `UnsupportedHost ()` | the host is not macOS | `UnsupportedHost` |

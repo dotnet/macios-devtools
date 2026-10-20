@@ -217,7 +217,17 @@ static class DeviceCtlFixtures {
 
 	/// <summary>What devicectl writes when a command fails.</summary>
 	public static string ErrorDocument (string description) =>
-		"{\"error\":{\"code\":1000,\"domain\":\"com.apple.dt.CoreDeviceError\",\"userInfo\":{\"NSLocalizedDescription\":{\"string\":\"" + description + "\"}}},\"info\":{\"outcome\":\"failed\"}}";
+		"{" + ErrorObject (description) + ",\"info\":{\"outcome\":\"failed\"}}";
+
+	/// <summary>
+	/// An error report that also carries a device list. devicectl does not write one,
+	/// but a list next to an error must not be mistaken for the result of a successful run.
+	/// </summary>
+	public static string ErrorDocumentWithDevices (string description, params string [] devices) =>
+		"{" + ErrorObject (description) + ",\"info\":{\"outcome\":\"failed\"},\"result\":{\"devices\":[" + string.Join (",", devices) + "]}}";
+
+	static string ErrorObject (string description) =>
+		"\"error\":{\"code\":1000,\"domain\":\"com.apple.dt.CoreDeviceError\",\"userInfo\":{\"NSLocalizedDescription\":{\"string\":\"" + description + "\"}}}";
 
 	/// <summary>
 	/// The document as <c>devicectl list devices --omit-deprecated-fields-in-json</c> writes it: without the deprecated properties
