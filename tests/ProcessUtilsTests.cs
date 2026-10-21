@@ -115,5 +115,30 @@ namespace Tests {
 			var (exitCode, _, _) = ProcessUtils.Exec (ShellExe, ExitArgs (7));
 			Assert.That (exitCode, Is.EqualTo (7));
 		}
+
+		[Test]
+		[Platform (Exclude = "Win")]
+		public async Task StartProcess_Cancellation_KillsProcessesStartedByTheChild ()
+		{
+			var pidFile = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				using (var cts = new CancellationTokenSource ()) {
+					// The shell starts a long-running process, records its id and waits for it. Without killing
+					// the whole tree, that process keeps the output pipes open and the call would not complete.
+					var pending = ProcessUtils.RunAsync (ShellExe, cts.Token, "-c", $"sleep 60 & echo $! > '{pidFile}'; wait");
+					var childPid = await tests.ProcessTestHelper.WaitForPidAsync (pidFile, TimeSpan.FromSeconds (30));
+					Assert.That (tests.ProcessTestHelper.IsAlive (childPid), Is.True, "The process started by the shell should be running.");
+
+					cts.Cancel ();
+
+					var finished = await Task.WhenAny (pending, Task.Delay (TimeSpan.FromSeconds (30)));
+					Assert.That (finished, Is.SameAs (pending), "Cancelling did not end the call.");
+					Assert.CatchAsync<OperationCanceledException> (async () => await pending);
+					Assert.That (await tests.ProcessTestHelper.WaitUntilGoneAsync (childPid, TimeSpan.FromSeconds (30)), Is.True, "A process started by the child was left behind.");
+				}
+			} finally {
+				File.Delete (pidFile);
+			}
+		}
 	}
 }

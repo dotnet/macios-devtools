@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Linq;
 using NUnit.Framework;
 using Xamarin.MacDev;
+using Xamarin.MacDev.Models;
 
 namespace Xamarin.MacDev.Tests;
 
@@ -275,4 +277,442 @@ public class DeviceCtlOutputParserTests {
 		var result = DeviceCtlOutputParser.ParseDevices ("{ not valid json");
 		Assert.That (result.Count, Is.EqualTo (0));
 	}
+
+	#region Hardware identity, connection state and simulators
+
+	[Test]
+	public void ParseDevices_LegacyLayout_ParsesHardwareUdidAndConnectionState ()
+	{
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{
+						""connectionProperties"": {
+							""pairingState"": ""paired"",
+							""transportType"": ""wired"",
+							""tunnelState"": ""connected""
+						},
+						""deviceProperties"": { ""name"": ""Test iPhone"" },
+						""hardwareProperties"": {
+							""deviceType"": ""iPhone"",
+							""udid"": ""00008130-001A2B3C4D5E6F78""
+						},
+						""identifier"": ""11111111-AAAA-BBBB-CCCC-111111111111""
+					}
+				]
+			}
+		}";
+
+		var device = DeviceCtlOutputParser.ParseDevices (json).Single ();
+
+		Assert.That (device.HardwareUdid, Is.EqualTo ("00008130-001A2B3C4D5E6F78"));
+		Assert.That (device.HasHardwareUdid, Is.True);
+		Assert.That (device.Udid, Is.EqualTo (device.HardwareUdid));
+		Assert.That (device.ConnectionState, Is.EqualTo ("connected"));
+		Assert.That (device.Availability, Is.EqualTo (PhysicalDeviceAvailability.Connected));
+		Assert.That (device.Reality, Is.EqualTo (""));
+		Assert.That (device.IsSimulated, Is.False);
+		Assert.That (device.MarketingName, Is.EqualTo (""));
+
+		var connection = device.Connections.Single ();
+		Assert.That (connection.Identifier, Is.EqualTo ("11111111-AAAA-BBBB-CCCC-111111111111"));
+		Assert.That (connection.TransportType, Is.EqualTo ("wired"));
+		Assert.That (connection.PairingState, Is.EqualTo ("paired"));
+		Assert.That (connection.ConnectionState, Is.EqualTo ("connected"));
+	}
+
+	[Test]
+	public void ParseDevices_JsonVersion5_ParsesHardwareIdentityAndConnectionState ()
+	{
+		var json = @"{
+			""info"": { ""jsonVersion"": 5 },
+			""result"": {
+				""devices"": [
+					{
+						""identifier"": ""11111111-AAAA-BBBB-CCCC-111111111111"",
+						""properties"": {
+							""connection"": {
+								""pairingState"": ""paired"",
+								""state"": ""disconnected"",
+								""transportType"": ""localNetwork""
+							},
+							""hardware"": {
+								""deviceType"": ""iPhone"",
+								""marketingName"": ""iPhone 15 Pro"",
+								""platform"": ""iOS"",
+								""productType"": ""iPhone16,1"",
+								""reality"": ""physical"",
+								""udid"": ""00008130-001A2B3C4D5E6F78""
+							},
+							""software"": {
+								""osBuildVersions"": { ""buildVersion"": { ""name"": ""22B83"" } },
+								""osVersionNumber"": { ""stringValue"": ""18.1"" }
+							},
+							""state"": { ""name"": ""Test iPhone"" }
+						}
+					}
+				]
+			}
+		}";
+
+		var device = DeviceCtlOutputParser.ParseDevices (json).Single ();
+
+		Assert.That (device.Name, Is.EqualTo ("Test iPhone"));
+		Assert.That (device.HardwareUdid, Is.EqualTo ("00008130-001A2B3C4D5E6F78"));
+		Assert.That (device.Identifier, Is.EqualTo ("11111111-AAAA-BBBB-CCCC-111111111111"));
+		Assert.That (device.MarketingName, Is.EqualTo ("iPhone 15 Pro"));
+		Assert.That (device.Reality, Is.EqualTo ("physical"));
+		Assert.That (device.OSVersion, Is.EqualTo ("18.1"));
+		Assert.That (device.BuildVersion, Is.EqualTo ("22B83"));
+		Assert.That (device.TransportType, Is.EqualTo ("localNetwork"));
+		Assert.That (device.PairingState, Is.EqualTo ("paired"));
+		Assert.That (device.ConnectionState, Is.EqualTo ("disconnected"));
+		Assert.That (device.Availability, Is.EqualTo (PhysicalDeviceAvailability.Available));
+		Assert.That (device.Connections.Single ().ConnectionState, Is.EqualTo ("disconnected"));
+	}
+
+	[Test]
+	public void ParseDevices_JsonVersion5_StateObjectIsNotMistakenForTheConnectionState ()
+	{
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{
+						""identifier"": ""CD-1"",
+						""properties"": {
+							""connection"": { ""pairingState"": ""paired"", ""transportType"": ""wired"" },
+							""hardware"": { ""udid"": ""UDID-1"" },
+							""state"": { ""name"": ""Test iPhone"", ""preparednessState"": ""unprepared"" }
+						}
+					}
+				]
+			}
+		}";
+
+		var device = DeviceCtlOutputParser.ParseDevices (json).Single ();
+
+		Assert.That (device.ConnectionState, Is.EqualTo (""));
+		Assert.That (device.Availability, Is.EqualTo (PhysicalDeviceAvailability.Unknown));
+		Assert.That (device.PairingState, Is.EqualTo ("paired"));
+	}
+
+	[Test]
+	public void ParseDevices_SimulatorEntries_AreReturnedAndFlagged ()
+	{
+		// Xcode 27 lists simulators next to physical devices, flagged by "reality" and/or "visibilityClass".
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{
+						""identifier"": ""SIM-1"",
+						""properties"": {
+							""hardware"": { ""reality"": ""simulated"", ""udid"": ""SIM-1"" },
+							""state"": { ""name"": ""iPhone 16 Pro"" }
+						}
+					},
+					{
+						""identifier"": ""SIM-2"",
+						""properties"": {
+							""hardware"": { ""udid"": ""SIM-2"" },
+							""state"": { ""name"": ""iPad Pro"", ""visibilityClass"": ""simulators"" }
+						}
+					},
+					{
+						""identifier"": ""SIM-3"",
+						""visibilityClass"": ""simulators"",
+						""properties"": {
+							""hardware"": { ""udid"": ""SIM-3"" },
+							""state"": { ""name"": ""Apple Watch"" }
+						}
+					},
+					{
+						""identifier"": ""CD-1"",
+						""visibilityClass"": ""default"",
+						""properties"": {
+							""hardware"": { ""reality"": ""physical"", ""udid"": ""UDID-1"" },
+							""state"": { ""name"": ""Test iPhone"" }
+						}
+					}
+				]
+			}
+		}";
+
+		var devices = DeviceCtlOutputParser.ParseDevices (json);
+
+		Assert.That (devices.Select (d => d.Name), Is.EqualTo (new [] { "iPhone 16 Pro", "iPad Pro", "Apple Watch", "Test iPhone" }));
+		Assert.That (devices.Select (d => d.IsSimulated), Is.EqualTo (new [] { true, true, true, false }));
+		Assert.That (devices.Select (d => d.Reality), Is.EqualTo (new [] { "simulated", "simulated", "simulated", "physical" }));
+	}
+
+	[Test]
+	public void ParseDevices_MissingHardwareUdid_KeepsTheUdidFallbackButReportsThatItWasMissing ()
+	{
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{
+						""hardwareProperties"": { ""deviceType"": ""appleWatch"" },
+						""identifier"": ""CD-1""
+					}
+				]
+			}
+		}";
+
+		var device = DeviceCtlOutputParser.ParseDevices (json).Single ();
+
+		Assert.That (device.HasHardwareUdid, Is.False);
+		Assert.That (device.HardwareUdid, Is.EqualTo (""));
+		Assert.That (device.Udid, Is.EqualTo ("CD-1"));
+	}
+
+	[Test]
+	public void ParseDevices_SameDeviceReportedTwice_ReturnsBothEntries ()
+	{
+		// The lenient parser never merges entries; PhysicalDeviceService does.
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{ ""hardwareProperties"": { ""udid"": ""UDID-1"" }, ""identifier"": ""CD-1"" },
+					{ ""hardwareProperties"": { ""udid"": ""UDID-1"" }, ""identifier"": ""CD-2"" }
+				]
+			}
+		}";
+
+		var devices = DeviceCtlOutputParser.ParseDevices (json);
+
+		Assert.That (devices.Select (d => d.Identifier), Is.EqualTo (new [] { "CD-1", "CD-2" }));
+	}
+
+	#endregion
+
+	#region Values of an unexpected type
+
+	[TestCase ("\"12345\"")]
+	[TestCase ("true")]
+	[TestCase ("null")]
+	[TestCase ("{}")]
+	[TestCase ("[]")]
+	[TestCase ("1.5")]
+	[TestCase ("-1")]
+	public void ParseDevices_EcidThatIsNotAnUnsignedInteger_KeepsEveryDevice (string ecid)
+	{
+		// An optional value of the wrong type must neither fail the parse nor hide the devices that follow.
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", ""properties"": { ""hardware"": { ""ecid"": ECID, ""udid"": ""UDID-1"" } } },
+					{ ""identifier"": ""CD-2"", ""properties"": { ""hardware"": { ""ecid"": 42, ""udid"": ""UDID-2"" } } }
+				]
+			}
+		}".Replace ("ECID", ecid);
+
+		var devices = DeviceCtlOutputParser.ParseDevices (json);
+		var success = DeviceCtlOutputParser.TryParseDevices (json, out var strict, out var error);
+
+		Assert.That (devices.Select (d => d.Identifier), Is.EqualTo (new [] { "CD-1", "CD-2" }));
+		Assert.That (devices.Select (d => d.UniqueChipID), Is.EqualTo (new ulong? [] { null, 42 }));
+		Assert.That (success, Is.True, error);
+		Assert.That (strict.Select (d => d.UniqueChipID), Is.EqualTo (new ulong? [] { null, 42 }));
+	}
+
+	[Test]
+	public void ParseDevices_EcidThatIsNotANumberInTheFirstScope_UsesTheNextOne ()
+	{
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", ""properties"": { ""hardware"": { ""ecid"": ""oops"" }, ""ecid"": 7 } }
+				]
+			}
+		}";
+
+		Assert.That (DeviceCtlOutputParser.ParseDevices (json).Single ().UniqueChipID, Is.EqualTo ((ulong) 7));
+	}
+
+	[Test]
+	public void ParseDevices_CpuTypeWithValuesThatAreNotNumbers_KeepsEveryDevice ()
+	{
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", ""properties"": { ""hardware"": { ""cpuType"": { ""type"": ""arm64"" }, ""udid"": ""UDID-1"" } } },
+					{ ""identifier"": ""CD-2"", ""properties"": { ""hardware"": { ""cpuType"": { ""type"": null }, ""udid"": ""UDID-2"" } } },
+					{ ""identifier"": ""CD-3"", ""properties"": { ""hardware"": { ""cpuType"": { ""type"": 16777228, ""subtype"": ""2"" }, ""udid"": ""UDID-3"" } } },
+					{ ""identifier"": ""CD-4"", ""properties"": { ""hardware"": { ""cpuType"": { ""type"": 16777228, ""subtype"": 2 }, ""udid"": ""UDID-4"" } } }
+				]
+			}
+		}";
+
+		var devices = DeviceCtlOutputParser.ParseDevices (json);
+
+		Assert.That (devices.Select (d => d.Identifier), Is.EqualTo (new [] { "CD-1", "CD-2", "CD-3", "CD-4" }));
+		Assert.That (devices.Select (d => d.CpuArchitecture), Is.EqualTo (new [] { "", "", "arm64", "arm64e" }));
+		Assert.That (DeviceCtlOutputParser.TryParseDevices (json, out var strict, out var error), Is.True, error);
+		Assert.That (strict, Has.Count.EqualTo (4));
+	}
+
+	[Test]
+	public void ParseDevices_EntryWithoutAnIdentity_IsStillReturned ()
+	{
+		// dotnet/macios lists whatever devicectl reports, so only TryParseDevices validates the identity of an entry.
+		var devices = DeviceCtlOutputParser.ParseDevices ("{\"result\":{\"devices\":[{},{\"identifier\":\"CD-1\"}]}}");
+
+		Assert.That (devices.Select (d => d.Identifier), Is.EqualTo (new [] { "", "CD-1" }));
+	}
+
+	[Test]
+	public void Parsers_AcceptTrailingCommasAndComments ()
+	{
+		// devicectl output has to be accepted the way dotnet/macios already accepts it.
+		var json = @"{
+			// a comment
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", /* another one */ ""properties"": { ""hardware"": { ""udid"": ""UDID-1"", }, }, },
+				],
+			},
+		}";
+
+		var lenient = DeviceCtlOutputParser.ParseDevices (json);
+		var success = DeviceCtlOutputParser.TryParseDevices (json, out var strict, out var error);
+
+		Assert.That (lenient.Single ().HardwareUdid, Is.EqualTo ("UDID-1"));
+		Assert.That (success, Is.True, error);
+		Assert.That (strict.Single ().HardwareUdid, Is.EqualTo ("UDID-1"));
+	}
+
+	#endregion
+
+	#region TryParseDevices
+
+	[Test]
+	public void TryParseDevices_EmptyDeviceList_Succeeds ()
+	{
+		var success = DeviceCtlOutputParser.TryParseDevices ("{\"result\":{\"devices\":[]}}", out var devices, out var error);
+
+		Assert.That (success, Is.True);
+		Assert.That (devices, Is.Empty);
+		Assert.That (error, Is.Null);
+	}
+
+	[Test]
+	public void TryParseDevices_ReturnsEveryEntryIncludingSimulatorsAndRepeats ()
+	{
+		var json = @"{
+			""result"": {
+				""devices"": [
+					{ ""identifier"": ""CD-1"", ""properties"": { ""hardware"": { ""udid"": ""UDID-1"" } } },
+					{ ""identifier"": ""CD-2"", ""properties"": { ""hardware"": { ""udid"": ""UDID-1"" } } },
+					{ ""identifier"": ""SIM-1"", ""properties"": { ""hardware"": { ""reality"": ""simulated"", ""udid"": ""SIM-1"" } } }
+				]
+			}
+		}";
+
+		var success = DeviceCtlOutputParser.TryParseDevices (json, out var devices, out var error);
+
+		Assert.That (success, Is.True, error);
+		Assert.That (devices.Select (d => d.Identifier), Is.EqualTo (new [] { "CD-1", "CD-2", "SIM-1" }));
+		Assert.That (devices.Select (d => d.IsSimulated), Is.EqualTo (new [] { false, false, true }));
+	}
+
+	[TestCase (null)]
+	[TestCase ("")]
+	[TestCase ("  \n")]
+	[TestCase ("not json")]
+	[TestCase ("{ \"result\": { \"devices\": [ ")]
+	[TestCase ("[]")]
+	[TestCase ("42")]
+	[TestCase ("null")]
+	[TestCase ("{}")]
+	[TestCase ("{\"result\":{}}")]
+	[TestCase ("{\"result\":[]}")]
+	[TestCase ("{\"result\":{\"devices\":{}}}")]
+	[TestCase ("{\"result\":{\"devices\":[42]}}")]
+	[TestCase ("{\"result\":{\"devices\":[{\"identifier\":\"CD-1\"},\"oops\"]}}")]
+	[TestCase ("{\"result\":{\"devices\":[{\"identifier\":\"CD-1\"},{}]}}")]
+	public void TryParseDevices_OutputThatIsNotADeviceList_Fails (string json)
+	{
+		var success = DeviceCtlOutputParser.TryParseDevices (json, out var devices, out var error);
+
+		Assert.That (success, Is.False);
+		Assert.That (devices, Is.Empty, "A failed parse must not return partial results.");
+		Assert.That (error, Is.Not.Null.And.Not.Empty);
+	}
+
+	[TestCase ("{}")]
+	[TestCase ("{\"properties\":{\"hardware\":{\"udid\":\"UDID-1\"}}}")]
+	[TestCase ("{\"identifier\":null}")]
+	[TestCase ("{\"identifier\":\"\"}")]
+	[TestCase ("{\"identifier\":\"  \"}")]
+	[TestCase ("{\"identifier\":42}")]
+	[TestCase ("{\"identifier\":true}")]
+	[TestCase ("{\"identifier\":[\"CD-1\"]}")]
+	[TestCase ("{\"identifier\":{\"id\":\"CD-1\"}}")]
+	public void TryParseDevices_EntryWithoutATextIdentifier_Fails (string device)
+	{
+		var success = DeviceCtlOutputParser.TryParseDevices ("{\"result\":{\"devices\":[" + device + "]}}", out var devices, out var error);
+
+		Assert.That (success, Is.False);
+		Assert.That (devices, Is.Empty);
+		Assert.That (error, Does.Contain ("'identifier'"));
+	}
+
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"hardware\":{\"udid\":42}}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"hardware\":{\"udid\":[\"UDID-1\"]}}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"udid\":{\"id\":\"UDID-1\"}}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"hardwareProperties\":{\"udid\":true}}")]
+	public void TryParseDevices_EntryWithAHardwareUdidThatIsNotText_Fails (string device)
+	{
+		var success = DeviceCtlOutputParser.TryParseDevices ("{\"result\":{\"devices\":[" + device + "]}}", out var devices, out var error);
+
+		Assert.That (success, Is.False);
+		Assert.That (devices, Is.Empty);
+		Assert.That (error, Does.Contain ("'udid'"));
+	}
+
+	[TestCase ("{\"identifier\":\"CD-1\"}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"hardwareProperties\":{\"deviceType\":\"mac\",\"platform\":\"macOS\"}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"hardware\":{\"udid\":null}}}")]
+	[TestCase ("{\"identifier\":\"CD-1\",\"properties\":{\"hardware\":{\"udid\":\"\"}}}")]
+	public void TryParseDevices_EntryWithAnIdentifierAndNoHardwareUdid_Succeeds (string device)
+	{
+		// Some hardware (a Mac, for example) has no UDID in devicectl's output; the CoreDevice identifier is all it has.
+		var success = DeviceCtlOutputParser.TryParseDevices ("{\"result\":{\"devices\":[" + device + "]}}", out var devices, out var error);
+
+		Assert.That (success, Is.True, error);
+		var parsed = devices.Single ();
+		Assert.That (parsed.Identifier, Is.EqualTo ("CD-1"));
+		Assert.That (parsed.HasHardwareUdid, Is.False);
+		Assert.That (parsed.Udid, Is.EqualTo ("CD-1"));
+	}
+
+	#endregion
+
+	#region GetErrorMessage
+
+	[TestCase ("{\"error\":{\"code\":1000,\"domain\":\"com.apple.dt.CoreDeviceError\",\"userInfo\":{\"NSLocalizedDescription\":{\"string\":\"Wrapped message.\"}}}}", "Wrapped message.")]
+	[TestCase ("{\"error\":{\"userInfo\":{\"NSLocalizedDescription\":\"Plain message.\"}}}", "Plain message.")]
+	[TestCase ("{\"error\":{\"code\":42,\"domain\":\"com.apple.dt.CoreDeviceError\"}}", "com.apple.dt.CoreDeviceError error 42")]
+	[TestCase ("{\"error\":{\"code\":7,\"domain\":\"d\",\"userInfo\":{\"NSLocalizedDescription\":{\"string\":\"\"}}}}", "d error 7")]
+	[TestCase ("{\"error\":{\"code\":42}}", "devicectl error 42")]
+	[TestCase ("{\"error\":{}}", "devicectl reported an error.")]
+	public void GetErrorMessage_ReturnsWhatDeviceCtlReported (string json, string expected)
+	{
+		Assert.That (DeviceCtlOutputParser.GetErrorMessage (json), Is.EqualTo (expected));
+	}
+
+	[TestCase (null)]
+	[TestCase ("")]
+	[TestCase ("   ")]
+	[TestCase ("not json")]
+	[TestCase ("[]")]
+	[TestCase ("{\"result\":{\"devices\":[]}}")]
+	[TestCase ("{\"error\":\"text\"}")]
+	[TestCase ("{\"error\":null}")]
+	public void GetErrorMessage_WithoutAnErrorObject_ReturnsNull (string json)
+	{
+		Assert.That (DeviceCtlOutputParser.GetErrorMessage (json), Is.Null);
+	}
+
+	#endregion
 }
