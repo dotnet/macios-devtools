@@ -792,30 +792,48 @@ namespace Xamarin.MacDev {
 
 		/// <summary>
 		/// Tries to open a plist file as a PDictionary.
-		/// Returns false if the file does not exist, cannot be parsed, or does not contain a dictionary.
+		/// Returns false in case of failure (the file does not exist, cannot be parsed, does not contain a dictionary, or any other failure).
 		/// </summary>
 		public static bool TryOpenFile (string fileName, [NotNullWhen (true)] out PDictionary? result)
 		{
-			return TryOpenFile (fileName, out result, out _);
+			return TryOpenFile (fileName, out result, out Exception? _);
 		}
 
 		/// <summary>
 		/// Tries to open a plist file as a PDictionary.
-		/// Returns false if the file does not exist, cannot be parsed, or does not contain a dictionary.
+		/// Returns false in case of failure (the file does not exist, cannot be parsed, does not contain a dictionary, or any other failure).
+		/// </summary>
+		public static bool TryOpenFile (string fileName, [NotNullWhen (true)] out PDictionary? result, [NotNullWhen (false)] out Exception? exception)
+		{
+			return TryOpenFile (fileName, out result, out _, out exception);
+		}
+
+		/// <summary>
+		/// Tries to open a plist file as a PDictionary.
+		/// Returns false in case of failure (the file does not exist, cannot be parsed, does not contain a dictionary, or any other failure).
 		/// </summary>
 		public static bool TryOpenFile (string fileName, [NotNullWhen (true)] out PDictionary? result, out bool isBinary)
 		{
+			return TryOpenFile (fileName, out result, out isBinary, out var _);
+		}
+
+		/// <summary>
+		/// Tries to open a plist file as a PDictionary.
+		/// Returns false in case of failure (the file does not exist, cannot be parsed, does not contain a dictionary, or any other failure).
+		/// </summary>
+		public static bool TryOpenFile (string fileName, [NotNullWhen (true)] out PDictionary? result, out bool isBinary, [NotNullWhen (false)] out Exception? exception)
+		{
 			result = null;
 			isBinary = false;
+			exception = null;
 
 			try {
-				var obj = PObject.FromFile (fileName, out isBinary);
-				if (obj is PDictionary dict) {
-					result = dict;
-					return true;
-				}
-				return false;
-			} catch {
+				result = (PDictionary?) PObject.FromFile (fileName, out isBinary);
+				if (result is null)
+					throw new FormatException ("Unrecognized property list format.");
+				return true;
+			} catch (Exception ex) {
+				exception = ex;
 				return false;
 			}
 		}
