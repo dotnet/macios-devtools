@@ -39,6 +39,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security;
 using System.Text;
 using System.Threading.Tasks;
@@ -812,6 +813,7 @@ namespace Xamarin.MacDev {
 		/// Tries to open a plist file as a PDictionary.
 		/// Returns false in case of failure (the file does not exist, cannot be parsed, does not contain a dictionary, or any other failure).
 		/// </summary>
+		[OverloadResolutionPriority (1)] // keep existing calls like 'TryOpenFile (path, out var dict, out var isBinary)' binding to this overload
 		public static bool TryOpenFile (string fileName, [NotNullWhen (true)] out PDictionary? result, out bool isBinary)
 		{
 			return TryOpenFile (fileName, out result, out isBinary, out var _);
