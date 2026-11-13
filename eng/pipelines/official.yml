@@ -18,6 +18,7 @@ trigger:
     include:
     - main
     - release/*
+    - release-test/*
 
 pr: none
 
