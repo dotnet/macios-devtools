@@ -96,7 +96,6 @@ namespace Tests {
 				expected = Encoding.UTF8.GetString (buffer);
 			}
 
-			output = output.Replace ("\r\n", "\n").Replace ("\r", "\n");
 			expected = expected.Replace ("\r\n", "\n").Replace ("\r", "\n");
 			Assert.That (output, Is.EqualTo (expected));
 		}
