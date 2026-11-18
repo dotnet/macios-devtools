@@ -190,5 +190,48 @@ namespace Tests {
 				Directory.Delete (tmpdir, true);
 			}
 		}
+
+		[Test]
+		public void GetMobileProvision_MatchesFilenameCaseInsensitively ()
+		{
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				var now = DateTime.UtcNow;
+				var fileName = Path.Combine (tmpdir, "profiles", "PROFILE.MOBILEPROVISION");
+				WriteProfile (fileName, "Other Profile", "OTHER-UUID", now.AddDays (-1), now.AddDays (10));
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "profile", new [] { Path.GetDirectoryName (fileName) }, Path.Combine (tmpdir, "profiles.index"));
+
+				Assert.That (profile?.Uuid, Is.EqualTo ("OTHER-UUID"));
+			} finally {
+				Directory.Delete (tmpdir, true);
+			}
+		}
+
+		[Test]
+		public void OpenIndex_ReindexesPreviouslyUnreadableProfileWhenRepaired ()
+		{
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				var profileDir = Path.Combine (tmpdir, "profiles");
+				var indexPath = Path.Combine (tmpdir, "profiles.index");
+				Directory.CreateDirectory (profileDir);
+				WriteProfile (Path.Combine (profileDir, "Other.mobileprovision"), "Other", "OTHER-UUID", DateTime.UtcNow, DateTime.UtcNow.AddDays (10));
+
+				var repairedFile = Path.Combine (profileDir, "Repaired.mobileprovision");
+				File.WriteAllText (repairedFile, "Invalid profile");
+				var index = MobileProvisionIndex.CreateIndex (new [] { profileDir }, indexPath);
+
+				WriteProfile (repairedFile, "Repaired", "REPAIRED-UUID", DateTime.UtcNow, DateTime.UtcNow.AddDays (10));
+				File.SetLastWriteTimeUtc (repairedFile, index.LastModified.AddMinutes (1));
+				Directory.SetLastWriteTimeUtc (profileDir, index.LastModified);
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Repaired", new [] { profileDir }, indexPath);
+
+				Assert.That (profile?.Uuid, Is.EqualTo ("REPAIRED-UUID"));
+			} finally {
+				Directory.Delete (tmpdir, true);
+			}
+		}
 	}
 }

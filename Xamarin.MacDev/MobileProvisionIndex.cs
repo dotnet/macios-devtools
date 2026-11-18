@@ -36,7 +36,30 @@ namespace Xamarin.MacDev {
 	public class MobileProvisionIndex {
 		static readonly string IndexFileName;
 		static readonly MobileProvisionCreationDateComparer CreationDateComparer = new MobileProvisionCreationDateComparer ();
-		const int IndexVersion = 1;
+		const int IndexVersion = 2;
+
+		class UnindexedProfileFile {
+			public string FileName { get; private set; }
+			public DateTime LastModified { get; private set; }
+
+			public UnindexedProfileFile (string fileName)
+			{
+				FileName = fileName;
+				LastModified = File.GetLastWriteTimeUtc (fileName);
+			}
+
+			public UnindexedProfileFile (BinaryReader reader)
+			{
+				FileName = reader.ReadString ();
+				LastModified = new DateTime (reader.ReadInt64 (), DateTimeKind.Utc);
+			}
+
+			public void Write (BinaryWriter writer)
+			{
+				writer.Write (FileName);
+				writer.Write (LastModified.Ticks);
+			}
+		}
 
 		public class DeveloperCertificate {
 			public string Name { get; private set; }
@@ -188,6 +211,7 @@ namespace Xamarin.MacDev {
 		#region MobileProvisionIndex
 
 		public List<ProvisioningProfile> ProvisioningProfiles { get; private set; }
+		List<UnindexedProfileFile> UnindexedProfileFiles { get; set; }
 		public DateTime LastModified { get; private set; }
 		public int Version { get; private set; }
 
@@ -207,6 +231,7 @@ namespace Xamarin.MacDev {
 		MobileProvisionIndex ()
 		{
 			ProvisioningProfiles = new List<ProvisioningProfile> ();
+			UnindexedProfileFiles = new List<UnindexedProfileFile> ();
 		}
 
 		public static MobileProvisionIndex Load (string fileName)
@@ -229,6 +254,12 @@ namespace Xamarin.MacDev {
 							sorted = false;
 
 						previousCreationDate = profile.CreationDate;
+					}
+
+					if (index.Version >= 2) {
+						count = reader.ReadInt32 ();
+						for (int i = 0; i < count; i++)
+							index.UnindexedProfileFiles.Add (new UnindexedProfileFile (reader));
 					}
 
 					if (!sorted)
@@ -254,6 +285,10 @@ namespace Xamarin.MacDev {
 						writer.Write (ProvisioningProfiles.Count);
 						for (int i = 0; i < ProvisioningProfiles.Count; i++)
 							ProvisioningProfiles [i].Write (writer);
+
+						writer.Write (UnindexedProfileFiles.Count);
+						for (int i = 0; i < UnindexedProfileFiles.Count; i++)
+							UnindexedProfileFiles [i].Write (writer);
 					}
 				}
 
@@ -279,7 +314,7 @@ namespace Xamarin.MacDev {
 						mtime = mtime2;
 
 					foreach (var fileName in Directory.EnumerateFiles (profileDir)) {
-						if (!fileName.EndsWith (".mobileprovision", StringComparison.Ordinal) && !fileName.EndsWith (".provisionprofile", StringComparison.Ordinal))
+						if (!fileName.EndsWith (".mobileprovision", StringComparison.OrdinalIgnoreCase) && !fileName.EndsWith (".provisionprofile", StringComparison.OrdinalIgnoreCase))
 							continue;
 
 						try {
@@ -287,6 +322,7 @@ namespace Xamarin.MacDev {
 							index.ProvisioningProfiles.Add (profile);
 						} catch (Exception ex) {
 							LoggingService.LogWarning ("Error reading provisioning profile '{0}': {1}", fileName, ex);
+							index.UnindexedProfileFiles.Add (new UnindexedProfileFile (fileName));
 						}
 					}
 				} else {
@@ -325,6 +361,11 @@ namespace Xamarin.MacDev {
 		static bool AnyProfileModified (MobileProvisionIndex index)
 		{
 			foreach (var profile in index.ProvisioningProfiles) {
+				if (File.GetLastWriteTimeUtc (profile.FileName) != profile.LastModified)
+					return true;
+			}
+
+			foreach (var profile in index.UnindexedProfileFiles) {
 				if (File.GetLastWriteTimeUtc (profile.FileName) != profile.LastModified)
 					return true;
 			}
@@ -385,7 +426,7 @@ namespace Xamarin.MacDev {
 
 			// The index is sorted by creation date (newest first), so the first match is the newest one.
 			foreach (var profile in index.ProvisioningProfiles) {
-				if (!profile.FileName.EndsWith (extension, StringComparison.Ordinal)) {
+				if (!profile.FileName.EndsWith (extension, StringComparison.OrdinalIgnoreCase)) {
 					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its file name does not end with '{extension}'.");
 					continue;
 				}
@@ -395,7 +436,7 @@ namespace Xamarin.MacDev {
 					continue;
 				}
 
-				if (name != profile.Name && name != profile.Uuid && name != Path.GetFileNameWithoutExtension (profile.FileName)) {
+				if (name != profile.Name && name != profile.Uuid && !string.Equals (name + extension, Path.GetFileName (profile.FileName), StringComparison.OrdinalIgnoreCase)) {
 					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because neither its name, UUID nor file name matches '{name}'.");
 					continue;
 				}
