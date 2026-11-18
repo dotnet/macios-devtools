@@ -36,7 +36,30 @@ namespace Xamarin.MacDev {
 	public class MobileProvisionIndex {
 		static readonly string IndexFileName;
 		static readonly MobileProvisionCreationDateComparer CreationDateComparer = new MobileProvisionCreationDateComparer ();
-		const int IndexVersion = 1;
+		const int IndexVersion = 2;
+
+		class UnindexedProfileFile {
+			public string FileName { get; private set; }
+			public DateTime LastModified { get; private set; }
+
+			public UnindexedProfileFile (string fileName)
+			{
+				FileName = fileName;
+				LastModified = File.GetLastWriteTimeUtc (fileName);
+			}
+
+			public UnindexedProfileFile (BinaryReader reader)
+			{
+				FileName = reader.ReadString ();
+				LastModified = new DateTime (reader.ReadInt64 (), DateTimeKind.Utc);
+			}
+
+			public void Write (BinaryWriter writer)
+			{
+				writer.Write (FileName);
+				writer.Write (LastModified.Ticks);
+			}
+		}
 
 		public class DeveloperCertificate {
 			public string Name { get; private set; }
@@ -188,6 +211,7 @@ namespace Xamarin.MacDev {
 		#region MobileProvisionIndex
 
 		public List<ProvisioningProfile> ProvisioningProfiles { get; private set; }
+		List<UnindexedProfileFile> UnindexedProfileFiles { get; set; }
 		public DateTime LastModified { get; private set; }
 		public int Version { get; private set; }
 
@@ -207,6 +231,7 @@ namespace Xamarin.MacDev {
 		MobileProvisionIndex ()
 		{
 			ProvisioningProfiles = new List<ProvisioningProfile> ();
+			UnindexedProfileFiles = new List<UnindexedProfileFile> ();
 		}
 
 		public static MobileProvisionIndex Load (string fileName)
@@ -229,6 +254,12 @@ namespace Xamarin.MacDev {
 							sorted = false;
 
 						previousCreationDate = profile.CreationDate;
+					}
+
+					if (index.Version >= 2) {
+						count = reader.ReadInt32 ();
+						for (int i = 0; i < count; i++)
+							index.UnindexedProfileFiles.Add (new UnindexedProfileFile (reader));
 					}
 
 					if (!sorted)
@@ -254,6 +285,10 @@ namespace Xamarin.MacDev {
 						writer.Write (ProvisioningProfiles.Count);
 						for (int i = 0; i < ProvisioningProfiles.Count; i++)
 							ProvisioningProfiles [i].Write (writer);
+
+						writer.Write (UnindexedProfileFiles.Count);
+						for (int i = 0; i < UnindexedProfileFiles.Count; i++)
+							UnindexedProfileFiles [i].Write (writer);
 					}
 				}
 
@@ -279,7 +314,7 @@ namespace Xamarin.MacDev {
 						mtime = mtime2;
 
 					foreach (var fileName in Directory.EnumerateFiles (profileDir)) {
-						if (!fileName.EndsWith (".mobileprovision", StringComparison.Ordinal) && !fileName.EndsWith (".provisionprofile", StringComparison.Ordinal))
+						if (!fileName.EndsWith (".mobileprovision", StringComparison.OrdinalIgnoreCase) && !fileName.EndsWith (".provisionprofile", StringComparison.OrdinalIgnoreCase))
 							continue;
 
 						try {
@@ -287,6 +322,7 @@ namespace Xamarin.MacDev {
 							index.ProvisioningProfiles.Add (profile);
 						} catch (Exception ex) {
 							LoggingService.LogWarning ("Error reading provisioning profile '{0}': {1}", fileName, ex);
+							index.UnindexedProfileFiles.Add (new UnindexedProfileFile (fileName));
 						}
 					}
 				} else {
@@ -321,6 +357,22 @@ namespace Xamarin.MacDev {
 			return false;
 		}
 
+		// Overwriting an existing profile doesn't change the modification date of its directory.
+		static bool AnyProfileModified (MobileProvisionIndex index)
+		{
+			foreach (var profile in index.ProvisioningProfiles) {
+				if (File.GetLastWriteTimeUtc (profile.FileName) != profile.LastModified)
+					return true;
+			}
+
+			foreach (var profile in index.UnindexedProfileFiles) {
+				if (File.GetLastWriteTimeUtc (profile.FileName) != profile.LastModified)
+					return true;
+			}
+
+			return false;
+		}
+
 		public static MobileProvisionIndex OpenIndex (string [] profileDirs, string indexName)
 		{
 			MobileProvisionIndex index;
@@ -328,7 +380,7 @@ namespace Xamarin.MacDev {
 			try {
 				index = Load (indexName);
 
-				if (index.Version != IndexVersion || AnyProfileDirModifiedSince (profileDirs, index.LastModified))
+				if (index.Version != IndexVersion || AnyProfileDirModifiedSince (profileDirs, index.LastModified) || AnyProfileModified (index))
 					index = CreateIndex (profileDirs, indexName);
 
 				if (index.ProvisioningProfiles.Count == 0) {
@@ -347,43 +399,75 @@ namespace Xamarin.MacDev {
 			return index;
 		}
 
+		static string Describe (ProvisioningProfile profile)
+		{
+			return $"The profile '{profile.Name}' ({profile.Uuid}) in '{profile.FileName}'";
+		}
+
 		public static MobileProvision GetMobileProvision (MobileProvisionPlatform platform, string name, List<string> failures = null)
 		{
+			return GetMobileProvision (platform, name, MobileProvision.ProfileDirectories, IndexFileName);
+		}
+
+		internal static MobileProvision GetMobileProvision (MobileProvisionPlatform platform, string name, string [] profileDirs, string indexName)
+		{
 			var extension = MobileProvision.GetFileExtension (platform);
+			var index = OpenIndex (profileDirs, indexName);
+			var now = DateTime.UtcNow;
+			ProvisioningProfile selected = null;
+			ProvisioningProfile newestExpired = null;
 
-			foreach (var profileDir in MobileProvision.ProfileDirectories) {
-				var path = Path.Combine (profileDir, name + extension);
-
-				if (File.Exists (path))
-					return MobileProvision.LoadFromFile (path);
-			}
-
-			var index = OpenIndex (MobileProvision.ProfileDirectories, IndexFileName);
-			var latestCreationDate = DateTime.MinValue;
+			LoggingService.LogInfo ($"Looking for the provisioning profile '{name}' in {string.Join (", ", profileDirs.Select ((v) => $"'{v}'"))}.");
 
 			if (index.ProvisioningProfiles.Count == 0) {
 				LoggingService.LogInfo ($"Could not find any provisioning profiles on this machine.");
 				return null;
 			}
 
+			// The index is sorted by creation date (newest first), so the first match is the newest one.
 			foreach (var profile in index.ProvisioningProfiles) {
-				if (!profile.FileName.EndsWith (extension, StringComparison.Ordinal)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its FileName ({profile.FileName}) does not end with '{extension}'.");
+				if (!profile.FileName.EndsWith (extension, StringComparison.OrdinalIgnoreCase)) {
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its file name does not end with '{extension}'.");
 					continue;
 				}
 
 				if (!profile.Platforms.Contains (platform)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
 					continue;
 				}
 
-				if (name == profile.Name || name == profile.Uuid)
-					return MobileProvision.LoadFromFile (profile.FileName);
+				if (name != profile.Name && name != profile.Uuid && !string.Equals (name + extension, Path.GetFileName (profile.FileName), StringComparison.OrdinalIgnoreCase)) {
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because neither its name, UUID nor file name matches '{name}'.");
+					continue;
+				}
 
-				LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its Name and Uuid ({profile.Uuid}) do not match '{name}'.");
+				if (profile.ExpirationDate < now) {
+					LoggingService.LogInfo ($"{Describe (profile)} matches, but it's not applicable because it expired on {profile.ExpirationDate:u}.");
+					if (newestExpired == null)
+						newestExpired = profile;
+					continue;
+				}
+
+				if (selected != null) {
+					LoggingService.LogInfo ($"{Describe (profile)} matches, but it's not used because a newer matching profile was found in '{selected.FileName}' (created on {selected.CreationDate:u}).");
+					continue;
+				}
+
+				LoggingService.LogInfo ($"{Describe (profile)} matches (created on {profile.CreationDate:u}, expires on {profile.ExpirationDate:u}).");
+				selected = profile;
 			}
 
-			return null;
+			if (selected == null && newestExpired != null) {
+				LoggingService.LogInfo ($"All the profiles matching '{name}' have expired, using the newest one: '{newestExpired.FileName}'.");
+				selected = newestExpired;
+			}
+
+			if (selected == null) {
+				LoggingService.LogInfo ($"Could not find any provisioning profiles matching '{name}'.");
+				return null;
+			}
+
+			return MobileProvision.LoadFromFile (selected.FileName);
 		}
 
 		public static IList<MobileProvision> GetMobileProvisions (MobileProvisionPlatform platform, bool includeExpired = false, bool unique = false, List<string> failures = null)
@@ -404,17 +488,17 @@ namespace Xamarin.MacDev {
 				var profile = index.ProvisioningProfiles [i];
 
 				if (!profile.FileName.EndsWith (extension, StringComparison.Ordinal)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its FileName ({profile.FileName}) does not end with '{extension}'.");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its file name does not end with '{extension}'.");
 					continue;
 				}
 
 				if (!profile.Platforms.Contains (platform)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
 					continue;
 				}
 
 				if (!includeExpired && profile.ExpirationDate < now) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because it has expired ({profile.ExpirationDate}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because it has expired ({profile.ExpirationDate}).");
 					continue;
 				}
 
@@ -456,22 +540,22 @@ namespace Xamarin.MacDev {
 				var profile = index.ProvisioningProfiles [i];
 
 				if (!profile.FileName.EndsWith (extension, StringComparison.Ordinal)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its FileName ({profile.FileName}) does not end with '{extension}'.");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its file name does not end with '{extension}'.");
 					continue;
 				}
 
 				if (!profile.Platforms.Contains (platform)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
 					continue;
 				}
 
 				if (!includeExpired && profile.ExpirationDate < now) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because it has expired ({profile.ExpirationDate}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because it has expired ({profile.ExpirationDate}).");
 					continue;
 				}
 
 				if (type != MobileProvisionDistributionType.Any && (profile.Distribution & type) == 0) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its ({profile.Distribution}) does not match the expected type ({type}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its ({profile.Distribution}) does not match the expected type ({type}).");
 					continue;
 				}
 
@@ -525,28 +609,28 @@ namespace Xamarin.MacDev {
 				var profile = index.ProvisioningProfiles [i];
 
 				if (!profile.FileName.EndsWith (extension, StringComparison.Ordinal)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its FileName ({profile.FileName}) does not end with '{extension}'.");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its file name does not end with '{extension}'.");
 					continue;
 				}
 
 				if (!profile.Platforms.Contains (platform)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
 					continue;
 				}
 
 				if (!includeExpired && profile.ExpirationDate < now) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because it has expired ({profile.ExpirationDate}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because it has expired ({profile.ExpirationDate}).");
 					continue;
 				}
 
 				if (type != MobileProvisionDistributionType.Any && (profile.Distribution & type) == 0) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its ({profile.Distribution}) does not match the expected type ({type}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its ({profile.Distribution}) does not match the expected type ({type}).");
 					continue;
 				}
 
 				foreach (var cert in profile.DeveloperCertificates) {
 					if (!thumbprints.Contains (cert.Thumbprint)) {
-						LoggingService.LogInfo ($"The profile '{profile.Name}' might not be applicable because its developer certificate (of {profile.DeveloperCertificates.Count} certificates) {cert.Name}'s thumbprint ({cert.Thumbprint}) is not in the list of accepted thumbprints ({string.Join (", ", thumbprints)}).");
+						LoggingService.LogInfo ($"{Describe (profile)} might not be applicable because its developer certificate (of {profile.DeveloperCertificates.Count} certificates) {cert.Name}'s thumbprint ({cert.Thumbprint}) is not in the list of accepted thumbprints ({string.Join (", ", thumbprints)}).");
 						continue;
 					}
 
@@ -593,22 +677,22 @@ namespace Xamarin.MacDev {
 				var profile = index.ProvisioningProfiles [i];
 
 				if (!profile.FileName.EndsWith (extension, StringComparison.Ordinal)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its FileName ({profile.FileName}) does not end with '{extension}'.");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its file name does not end with '{extension}'.");
 					continue;
 				}
 
 				if (!profile.Platforms.Contains (platform)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
 					continue;
 				}
 
 				if (!includeExpired && profile.ExpirationDate < now) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because it has expired ({profile.ExpirationDate}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because it has expired ({profile.ExpirationDate}).");
 					continue;
 				}
 
 				if (type != MobileProvisionDistributionType.Any && (profile.Distribution & type) == 0) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its ({profile.Distribution}) does not match the expected type ({type}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its ({profile.Distribution}) does not match the expected type ({type}).");
 					continue;
 				}
 
@@ -624,12 +708,12 @@ namespace Xamarin.MacDev {
 					id = id.TrimEnd ('*');
 
 					if (!bundleIdentifier.StartsWith (id, StringComparison.Ordinal)) {
-						LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its id ({profile.ApplicationIdentifier}) does not match the bundle identifer {bundleIdentifier}.");
+						LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its id ({profile.ApplicationIdentifier}) does not match the bundle identifer {bundleIdentifier}.");
 						continue;
 					}
 				} else if (id != bundleIdentifier) {
 					// the CFBundleIdentifier provided by our caller does not match this provisioning profile
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its id ({profile.ApplicationIdentifier}) does not match the bundle identifer {bundleIdentifier}.");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its id ({profile.ApplicationIdentifier}) does not match the bundle identifer {bundleIdentifier}.");
 					continue;
 				}
 
@@ -686,22 +770,22 @@ namespace Xamarin.MacDev {
 				var profile = index.ProvisioningProfiles [i];
 
 				if (!profile.FileName.EndsWith (extension, StringComparison.Ordinal)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its FileName ({profile.FileName}) does not end with '{extension}'.");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its file name does not end with '{extension}'.");
 					continue;
 				}
 
 				if (!profile.Platforms.Contains (platform)) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its platforms ({string.Join (", ", profile.Platforms.Select ((v) => v.ToString ()))}) do not match the requested platform ({platform}).");
 					continue;
 				}
 
 				if (!includeExpired && profile.ExpirationDate < now) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because it has expired ({profile.ExpirationDate}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because it has expired ({profile.ExpirationDate}).");
 					continue;
 				}
 
 				if (type != MobileProvisionDistributionType.Any && (profile.Distribution & type) == 0) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its ({profile.Distribution}) does not match the expected type ({type}).");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its ({profile.Distribution}) does not match the expected type ({type}).");
 					continue;
 				}
 
@@ -717,18 +801,18 @@ namespace Xamarin.MacDev {
 					id = id.TrimEnd ('*');
 
 					if (!bundleIdentifier.StartsWith (id, StringComparison.Ordinal)) {
-						LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its id ({profile.ApplicationIdentifier}) does not match the bundle identifer {bundleIdentifier}.");
+						LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its id ({profile.ApplicationIdentifier}) does not match the bundle identifer {bundleIdentifier}.");
 						continue;
 					}
 				} else if (id != bundleIdentifier) {
 					// the CFBundleIdentifier provided by our caller does not match this provisioning profile
-					LoggingService.LogInfo ($"The profile '{profile.Name}' is not applicable because its id ({profile.ApplicationIdentifier}) does not match the bundle identifer {bundleIdentifier}.");
+					LoggingService.LogInfo ($"{Describe (profile)} is not applicable because its id ({profile.ApplicationIdentifier}) does not match the bundle identifer {bundleIdentifier}.");
 					continue;
 				}
 
 				var anyMatchingCerts = profile.DeveloperCertificates.Any (cert => thumbprints.Contains (cert.Thumbprint));
 				if (!anyMatchingCerts) {
-					LoggingService.LogInfo ($"The profile '{profile.Name}' ({profile.ApplicationIdentifier}) is not applicable because none of its developer certificates match the currently available certificates. This provisioning profile has {profile.DeveloperCertificates.Count} certificate(s):");
+					LoggingService.LogInfo ($"{Describe (profile)} ({profile.ApplicationIdentifier}) is not applicable because none of its developer certificates match the currently available certificates. This provisioning profile has {profile.DeveloperCertificates.Count} certificate(s):");
 					foreach (var cert in profile.DeveloperCertificates)
 						LoggingService.LogInfo ($"    {cert.Name} ({cert.Thumbprint})");
 				} else {

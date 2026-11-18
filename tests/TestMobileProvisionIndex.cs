@@ -123,5 +123,115 @@ namespace Tests {
 			Assert.That (index.ProvisioningProfiles [idXamarin].Platforms [0], Is.EqualTo (MobileProvisionPlatform.iOS));
 			Assert.That (index.ProvisioningProfiles [idXamarin].Uuid, Is.EqualTo ("7079f389-6ff4-4290-bf76-c8a222947616"));
 		}
+
+		static void WriteProfile (string path, string name, string uuid, DateTime creationDate, DateTime expirationDate)
+		{
+			Directory.CreateDirectory (Path.GetDirectoryName (path));
+			File.WriteAllText (path, $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<dict>
+	<key>Name</key>
+	<string>{name}</string>
+	<key>UUID</key>
+	<string>{uuid}</string>
+	<key>CreationDate</key>
+	<date>{creationDate:yyyy-MM-ddTHH:mm:ssZ}</date>
+	<key>ExpirationDate</key>
+	<date>{expirationDate:yyyy-MM-ddTHH:mm:ssZ}</date>
+	<key>Platform</key>
+	<array>
+		<string>iOS</string>
+	</array>
+	<key>DeveloperCertificates</key>
+	<array/>
+	<key>Entitlements</key>
+	<dict/>
+</dict>
+</plist>
+");
+		}
+
+		[Test]
+		public void GetMobileProvision_PrefersNewestUnexpiredProfile ()
+		{
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				var newDir = Path.Combine (tmpdir, "new");
+				var oldDir = Path.Combine (tmpdir, "old");
+				var now = DateTime.UtcNow;
+
+				// A profile named after the requested profile in the old directory used to win, even when it was expired.
+				WriteProfile (Path.Combine (oldDir, "Profile.mobileprovision"), "Profile", "OLD-UUID", now.AddYears (-3), now.AddYears (-2));
+				WriteProfile (Path.Combine (newDir, "NEW-UUID.mobileprovision"), "Profile", "NEW-UUID", now.AddDays (-10), now.AddDays (300));
+				WriteProfile (Path.Combine (newDir, "OLDER-UUID.mobileprovision"), "Profile", "OLDER-UUID", now.AddDays (-20), now.AddDays (290));
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Profile", new [] { newDir, oldDir }, Path.Combine (tmpdir, "profiles.index"));
+
+				Assert.That (profile?.Uuid, Is.EqualTo ("NEW-UUID"));
+			} finally {
+				Directory.Delete (tmpdir, true);
+			}
+		}
+
+		[Test]
+		public void GetMobileProvision_FallsBackToExpiredProfile ()
+		{
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				var now = DateTime.UtcNow;
+
+				WriteProfile (Path.Combine (tmpdir, "profiles", "Profile.mobileprovision"), "Profile", "EXPIRED-UUID", now.AddYears (-3), now.AddYears (-2));
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Profile", new [] { Path.Combine (tmpdir, "profiles") }, Path.Combine (tmpdir, "profiles.index"));
+
+				Assert.That (profile?.Uuid, Is.EqualTo ("EXPIRED-UUID"));
+			} finally {
+				Directory.Delete (tmpdir, true);
+			}
+		}
+
+		[Test]
+		public void GetMobileProvision_MatchesFilenameCaseInsensitively ()
+		{
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				var now = DateTime.UtcNow;
+				var fileName = Path.Combine (tmpdir, "profiles", "PROFILE.MOBILEPROVISION");
+				WriteProfile (fileName, "Other Profile", "OTHER-UUID", now.AddDays (-1), now.AddDays (10));
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "profile", new [] { Path.GetDirectoryName (fileName) }, Path.Combine (tmpdir, "profiles.index"));
+
+				Assert.That (profile?.Uuid, Is.EqualTo ("OTHER-UUID"));
+			} finally {
+				Directory.Delete (tmpdir, true);
+			}
+		}
+
+		[Test]
+		public void OpenIndex_ReindexesPreviouslyUnreadableProfileWhenRepaired ()
+		{
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				var profileDir = Path.Combine (tmpdir, "profiles");
+				var indexPath = Path.Combine (tmpdir, "profiles.index");
+				Directory.CreateDirectory (profileDir);
+				WriteProfile (Path.Combine (profileDir, "Other.mobileprovision"), "Other", "OTHER-UUID", DateTime.UtcNow, DateTime.UtcNow.AddDays (10));
+
+				var repairedFile = Path.Combine (profileDir, "Repaired.mobileprovision");
+				File.WriteAllText (repairedFile, "Invalid profile");
+				var index = MobileProvisionIndex.CreateIndex (new [] { profileDir }, indexPath);
+
+				WriteProfile (repairedFile, "Repaired", "REPAIRED-UUID", DateTime.UtcNow, DateTime.UtcNow.AddDays (10));
+				File.SetLastWriteTimeUtc (repairedFile, index.LastModified.AddMinutes (1));
+				Directory.SetLastWriteTimeUtc (profileDir, index.LastModified);
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Repaired", new [] { profileDir }, indexPath);
+
+				Assert.That (profile?.Uuid, Is.EqualTo ("REPAIRED-UUID"));
+			} finally {
+				Directory.Delete (tmpdir, true);
+			}
+		}
 	}
 }
