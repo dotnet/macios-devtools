@@ -2001,7 +2001,7 @@ namespace Xamarin.MacDev {
 					// content so we have to move the reader manually, unlike integers which
 					// implicitly move to the next node because we parse the content.
 					var result = CurrentType == PlistType.@true;
-					reader!.Read ();
+					reader!.Skip ();
 					return result;
 				}
 
