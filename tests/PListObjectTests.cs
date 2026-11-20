@@ -142,6 +142,36 @@ namespace Tests {
 			Assert.That (emojiValue, Is.EqualTo ("❌"));
 		}
 
+		[TestCase ("<false/>", false)]
+		[TestCase ("<true/>", true)]
+		[TestCase ("<false></false>", false)]
+		[TestCase ("<true></true>", true)]
+		[TestCase ("<false>\n\t</false>", false)]
+		[TestCase ("<true>\n\t</true>", true)]
+		public void TestBooleanXmlDictionaryDeserialization (string element, bool expected)
+		{
+			var plist = (PDictionary) PObject.FromString ($"<plist version=\"1.0\"><dict><key>Boolean</key>{element}<key>After</key><string>Expected</string></dict></plist>");
+
+			Assert.That (plist.Count, Is.EqualTo (2), "Dictionary count");
+			Assert.That (plist.Get<PBoolean> ("Boolean").Value, Is.EqualTo (expected), "Boolean");
+			Assert.That (plist.GetString ("After").Value, Is.EqualTo ("Expected"), "After");
+		}
+
+		[TestCase ("<false/>", false)]
+		[TestCase ("<true/>", true)]
+		[TestCase ("<false></false>", false)]
+		[TestCase ("<true></true>", true)]
+		[TestCase ("<false>\n\t</false>", false)]
+		[TestCase ("<true>\n\t</true>", true)]
+		public void TestBooleanXmlArrayDeserialization (string element, bool expected)
+		{
+			var plist = (PArray) PObject.FromString ($"<plist version=\"1.0\"><array>{element}<string>Expected</string></array></plist>");
+
+			Assert.That (plist.Count, Is.EqualTo (2), "Array count");
+			Assert.That (((PBoolean) plist [0]).Value, Is.EqualTo (expected), "Boolean");
+			Assert.That (((PString) plist [1]).Value, Is.EqualTo ("Expected"), "After");
+		}
+
 		string CreateTempPlistFile (string content)
 		{
 			var path = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName () + ".plist");
