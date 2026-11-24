@@ -14,9 +14,9 @@
 
   <!-- NuGet Package Properties -->
   <PropertyGroup>
-    <PackageId>Xamarin.Apple.Tools.MaciOS</PackageId>
-    <AssemblyName>Xamarin.Apple.Tools.MaciOS</AssemblyName>
-    <Title>Xamarin.Apple.Tools.MaciOS</Title>
+    <PackageId>Microsoft.Apple.Tools.MaciOS</PackageId>
+    <AssemblyName>Microsoft.Apple.Tools.MaciOS</AssemblyName>
+    <Title>Microsoft.Apple.Tools.MaciOS</Title>
     <Authors>Microsoft</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/dotnet/macios-devtools</PackageProjectUrl>

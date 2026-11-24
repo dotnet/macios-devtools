@@ -4,11 +4,11 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-[assembly: AssemblyTitle ("Xamarin.Apple.Tools.MaciOS")]
+[assembly: AssemblyTitle ("Microsoft.Apple.Tools.MaciOS")]
 [assembly: AssemblyDescription ("")]
 [assembly: AssemblyConfiguration ("")]
 [assembly: AssemblyCompany ("Microsoft Corporation")]
-[assembly: AssemblyProduct ("Xamarin.Apple.Tools.MaciOS")]
+[assembly: AssemblyProduct ("Microsoft.Apple.Tools.MaciOS")]
 [assembly: AssemblyCopyright ("© Microsoft Corporation. All rights reserved.")]
 [assembly: AssemblyTrademark ("")]
 [assembly: AssemblyCulture ("")]
