@@ -233,5 +233,86 @@ namespace Tests {
 				Directory.Delete (tmpdir, true);
 			}
 		}
+
+		[Test]
+		public void OpenIndex_SkipsMissingProfileDirectoryAndIndexesItWhenCreated ()
+		{
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				var existingDir = Path.Combine (tmpdir, "existing");
+				var missingDir = Path.Combine (tmpdir, "missing");
+				var indexPath = Path.Combine (tmpdir, "profiles.index");
+				Directory.CreateDirectory (existingDir);
+				WriteProfile (Path.Combine (existingDir, "Existing.mobileprovision"), "Existing", "EXISTING-UUID", DateTime.UtcNow, DateTime.UtcNow.AddDays (10));
+
+				var index = MobileProvisionIndex.CreateIndex (new [] { existingDir, missingDir }, indexPath);
+				Assert.That (Directory.Exists (missingDir), Is.False);
+
+				MobileProvisionIndex.OpenIndex (new [] { existingDir, missingDir }, indexPath);
+				Assert.That (Directory.Exists (missingDir), Is.False);
+
+				Directory.CreateDirectory (missingDir);
+				WriteProfile (Path.Combine (missingDir, "New.mobileprovision"), "New", "NEW-UUID", DateTime.UtcNow, DateTime.UtcNow.AddDays (10));
+				Directory.SetLastWriteTimeUtc (missingDir, index.LastModified.AddMinutes (-1));
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "New", new [] { existingDir, missingDir }, indexPath);
+
+				Assert.That (profile?.Uuid, Is.EqualTo ("NEW-UUID"));
+			} finally {
+				if (Directory.Exists (tmpdir))
+					Directory.Delete (tmpdir, true);
+			}
+		}
+
+#if NET10_0_OR_GREATER
+		[TestCase (false, false)]
+		[TestCase (false, true)]
+		[TestCase (true, false)]
+		[TestCase (true, true)]
+		[Platform (Exclude = "Win")]
+		public void GetMobileProvision_SkipsUnreadableDirectory (bool existingIndex, bool unreadableFirst)
+		{
+			if (OperatingSystem.IsWindows ())
+				return;
+
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			var unreadableDir = Path.Combine (tmpdir, "unreadable");
+			var permissions = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+			var log = new tests.RecordingLogger ();
+			try {
+				var readableDir = Path.Combine (tmpdir, "readable");
+				var indexPath = Path.Combine (tmpdir, "profiles.index");
+				var now = DateTime.UtcNow;
+				WriteProfile (Path.Combine (readableDir, "Profile.mobileprovision"), "Profile", "READABLE-UUID", now.AddDays (-2), now.AddDays (10));
+				WriteProfile (Path.Combine (unreadableDir, "Profile.mobileprovision"), "Profile", "UNREADABLE-UUID", now.AddDays (-1), now.AddDays (10));
+				Directory.SetLastWriteTimeUtc (unreadableDir, now.AddHours (-1));
+				Directory.SetLastWriteTimeUtc (readableDir, now);
+
+				var dirs = unreadableFirst ? new [] { unreadableDir, readableDir } : new [] { readableDir, unreadableDir };
+				if (existingIndex)
+					MobileProvisionIndex.CreateIndex (dirs, indexPath);
+
+				permissions = File.GetUnixFileMode (unreadableDir);
+				File.SetUnixFileMode (unreadableDir, UnixFileMode.None);
+				Assert.That (() => Directory.GetFiles (unreadableDir), Throws.TypeOf<UnauthorizedAccessException> (), "The test directory must be unreadable.");
+
+				LoggingService.SetCustomLogger (log);
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Profile", dirs, indexPath);
+				Assert.That (profile?.Uuid, Is.EqualTo ("READABLE-UUID"));
+				Assert.That (log.Messages, Has.Some.StartsWith ($"Error reading provisioning profile directory '{unreadableDir}'"));
+				Assert.That (log.Warnings, Has.None.StartsWith ($"Error reading provisioning profile directory '{unreadableDir}'"));
+
+				File.SetUnixFileMode (unreadableDir, permissions);
+				profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Profile", dirs, indexPath);
+				Assert.That (profile?.Uuid, Is.EqualTo ("UNREADABLE-UUID"), "Retry the skipped directory even when its modification time has not changed.");
+			} finally {
+				LoggingService.SetCustomLogger (null);
+				if (Directory.Exists (unreadableDir))
+					File.SetUnixFileMode (unreadableDir, permissions);
+				if (Directory.Exists (tmpdir))
+					Directory.Delete (tmpdir, true);
+			}
+		}
+#endif
 	}
 }

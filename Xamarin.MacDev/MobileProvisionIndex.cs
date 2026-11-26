@@ -36,7 +36,7 @@ namespace Xamarin.MacDev {
 	public class MobileProvisionIndex {
 		static readonly string IndexFileName;
 		static readonly MobileProvisionCreationDateComparer CreationDateComparer = new MobileProvisionCreationDateComparer ();
-		const int IndexVersion = 2;
+		const int IndexVersion = 3;
 
 		class UnindexedProfileFile {
 			public string FileName { get; private set; }
@@ -212,6 +212,7 @@ namespace Xamarin.MacDev {
 
 		public List<ProvisioningProfile> ProvisioningProfiles { get; private set; }
 		List<UnindexedProfileFile> UnindexedProfileFiles { get; set; }
+		List<string> MissingProfileDirs { get; set; }
 		public DateTime LastModified { get; private set; }
 		public int Version { get; private set; }
 
@@ -232,6 +233,7 @@ namespace Xamarin.MacDev {
 		{
 			ProvisioningProfiles = new List<ProvisioningProfile> ();
 			UnindexedProfileFiles = new List<UnindexedProfileFile> ();
+			MissingProfileDirs = new List<string> ();
 		}
 
 		public static MobileProvisionIndex Load (string fileName)
@@ -262,6 +264,12 @@ namespace Xamarin.MacDev {
 							index.UnindexedProfileFiles.Add (new UnindexedProfileFile (reader));
 					}
 
+					if (index.Version >= 3) {
+						count = reader.ReadInt32 ();
+						for (int i = 0; i < count; i++)
+							index.MissingProfileDirs.Add (reader.ReadString ());
+					}
+
 					if (!sorted)
 						index.ProvisioningProfiles.Sort (CreationDateComparer);
 
@@ -289,6 +297,10 @@ namespace Xamarin.MacDev {
 						writer.Write (UnindexedProfileFiles.Count);
 						for (int i = 0; i < UnindexedProfileFiles.Count; i++)
 							UnindexedProfileFiles [i].Write (writer);
+
+						writer.Write (MissingProfileDirs.Count);
+						for (int i = 0; i < MissingProfileDirs.Count; i++)
+							writer.Write (MissingProfileDirs [i]);
 					}
 				}
 
@@ -305,52 +317,80 @@ namespace Xamarin.MacDev {
 		{
 			var index = new MobileProvisionIndex ();
 			var mtime = DateTime.MinValue;
+			var allDirectoriesRead = true;
 
 			foreach (var profileDir in profileDirs) {
-				if (Directory.Exists (profileDir)) {
+				string [] fileNames;
+				try {
+					File.GetAttributes (profileDir);
 					var mtime2 = Directory.GetLastWriteTimeUtc (profileDir);
+					fileNames = Directory.GetFiles (profileDir);
 
 					if (mtime2 > mtime)
 						mtime = mtime2;
+				} catch (FileNotFoundException) {
+					index.MissingProfileDirs.Add (profileDir);
+					continue;
+				} catch (DirectoryNotFoundException) {
+					index.MissingProfileDirs.Add (profileDir);
+					continue;
+				} catch (UnauthorizedAccessException ex) {
+					LoggingService.LogInfo ("Error reading provisioning profile directory '{0}': {1}", profileDir, ex);
+					allDirectoriesRead = false;
+					continue;
+				} catch (IOException ex) {
+					LoggingService.LogInfo ("Error reading provisioning profile directory '{0}': {1}", profileDir, ex);
+					allDirectoriesRead = false;
+					continue;
+				}
 
-					foreach (var fileName in Directory.EnumerateFiles (profileDir)) {
-						if (!fileName.EndsWith (".mobileprovision", StringComparison.OrdinalIgnoreCase) && !fileName.EndsWith (".provisionprofile", StringComparison.OrdinalIgnoreCase))
-							continue;
+				foreach (var fileName in fileNames) {
+					if (!fileName.EndsWith (".mobileprovision", StringComparison.OrdinalIgnoreCase) && !fileName.EndsWith (".provisionprofile", StringComparison.OrdinalIgnoreCase))
+						continue;
 
-						try {
-							var profile = ProvisioningProfile.Load (fileName);
-							index.ProvisioningProfiles.Add (profile);
-						} catch (Exception ex) {
-							LoggingService.LogWarning ("Error reading provisioning profile '{0}': {1}", fileName, ex);
-							index.UnindexedProfileFiles.Add (new UnindexedProfileFile (fileName));
-						}
+					try {
+						var profile = ProvisioningProfile.Load (fileName);
+						index.ProvisioningProfiles.Add (profile);
+					} catch (Exception ex) {
+						LoggingService.LogWarning ("Error reading provisioning profile '{0}': {1}", fileName, ex);
+						index.UnindexedProfileFiles.Add (new UnindexedProfileFile (fileName));
 					}
-				} else {
-					Directory.CreateDirectory (profileDir);
 				}
 			}
 
 			index.ProvisioningProfiles.Sort (CreationDateComparer);
 			index.Version = IndexVersion;
-			index.LastModified = mtime;
+			// Retry skipped directories even if restoring access doesn't change their modification time.
+			index.LastModified = allDirectoriesRead ? mtime : DateTime.MinValue;
 
 			index.Save (indexName);
 
 			return index;
 		}
 
-		static bool AnyProfileDirModifiedSince (string [] dirs, DateTime mtime)
+		static bool AnyProfileDirModifiedSince (MobileProvisionIndex index, string [] dirs)
 		{
 			foreach (var dir in dirs) {
-				if (!Directory.Exists (dir)) {
-					// Note: When creating the index, we make sure to create each profile dir which means if any
-					// are deleted, then we likely need to reindex.
-					return true;
+				bool wasMissing = index.MissingProfileDirs.Contains (dir);
+				FileAttributes attributes;
+				try {
+					attributes = File.GetAttributes (dir);
+				} catch (FileNotFoundException) {
+					if (!wasMissing)
+						return true;
+					continue;
+				} catch (DirectoryNotFoundException) {
+					if (!wasMissing)
+						return true;
+					continue;
 				}
+
+				if (wasMissing || (attributes & FileAttributes.Directory) == 0)
+					return true;
 
 				var mtime2 = Directory.GetLastWriteTimeUtc (dir);
 
-				if (mtime2 > mtime)
+				if (mtime2 > index.LastModified)
 					return true;
 			}
 
@@ -380,7 +420,7 @@ namespace Xamarin.MacDev {
 			try {
 				index = Load (indexName);
 
-				if (index.Version != IndexVersion || AnyProfileDirModifiedSince (profileDirs, index.LastModified) || AnyProfileModified (index))
+				if (index.Version != IndexVersion || AnyProfileDirModifiedSince (index, profileDirs) || AnyProfileModified (index))
 					index = CreateIndex (profileDirs, indexName);
 
 				if (index.ProvisioningProfiles.Count == 0) {
