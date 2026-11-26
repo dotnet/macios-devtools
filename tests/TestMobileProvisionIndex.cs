@@ -233,5 +233,51 @@ namespace Tests {
 				Directory.Delete (tmpdir, true);
 			}
 		}
+
+#if NET10_0_OR_GREATER
+		[TestCase (false, false)]
+		[TestCase (false, true)]
+		[TestCase (true, false)]
+		[TestCase (true, true)]
+		[Platform (Exclude = "Win")]
+		public void GetMobileProvision_SkipsUnreadableDirectory (bool existingIndex, bool unreadableFirst)
+		{
+			if (OperatingSystem.IsWindows ())
+				return;
+
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			var unreadableDir = Path.Combine (tmpdir, "unreadable");
+			var permissions = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+			try {
+				var readableDir = Path.Combine (tmpdir, "readable");
+				var indexPath = Path.Combine (tmpdir, "profiles.index");
+				var now = DateTime.UtcNow;
+				WriteProfile (Path.Combine (readableDir, "Profile.mobileprovision"), "Profile", "READABLE-UUID", now.AddDays (-2), now.AddDays (10));
+				WriteProfile (Path.Combine (unreadableDir, "Profile.mobileprovision"), "Profile", "UNREADABLE-UUID", now.AddDays (-1), now.AddDays (10));
+				Directory.SetLastWriteTimeUtc (unreadableDir, now.AddHours (-1));
+				Directory.SetLastWriteTimeUtc (readableDir, now);
+
+				var dirs = unreadableFirst ? new [] { unreadableDir, readableDir } : new [] { readableDir, unreadableDir };
+				if (existingIndex)
+					MobileProvisionIndex.CreateIndex (dirs, indexPath);
+
+				permissions = File.GetUnixFileMode (unreadableDir);
+				File.SetUnixFileMode (unreadableDir, UnixFileMode.None);
+				Assert.That (() => Directory.GetFiles (unreadableDir), Throws.TypeOf<UnauthorizedAccessException> (), "The test directory must be unreadable.");
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Profile", dirs, indexPath);
+				Assert.That (profile?.Uuid, Is.EqualTo ("READABLE-UUID"));
+
+				File.SetUnixFileMode (unreadableDir, permissions);
+				profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Profile", dirs, indexPath);
+				Assert.That (profile?.Uuid, Is.EqualTo ("UNREADABLE-UUID"), "Retry the skipped directory even when its modification time has not changed.");
+			} finally {
+				if (Directory.Exists (unreadableDir))
+					File.SetUnixFileMode (unreadableDir, permissions);
+				if (Directory.Exists (tmpdir))
+					Directory.Delete (tmpdir, true);
+			}
+		}
+#endif
 	}
 }

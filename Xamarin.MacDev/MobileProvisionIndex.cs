@@ -305,34 +305,47 @@ namespace Xamarin.MacDev {
 		{
 			var index = new MobileProvisionIndex ();
 			var mtime = DateTime.MinValue;
+			var allDirectoriesRead = true;
 
 			foreach (var profileDir in profileDirs) {
-				if (Directory.Exists (profileDir)) {
+				string [] fileNames;
+				try {
+					if (!Directory.Exists (profileDir))
+						Directory.CreateDirectory (profileDir);
+
+					fileNames = Directory.GetFiles (profileDir);
 					var mtime2 = Directory.GetLastWriteTimeUtc (profileDir);
 
 					if (mtime2 > mtime)
 						mtime = mtime2;
+				} catch (UnauthorizedAccessException ex) {
+					LoggingService.LogWarning ("Error reading provisioning profile directory '{0}': {1}", profileDir, ex);
+					allDirectoriesRead = false;
+					continue;
+				} catch (IOException ex) {
+					LoggingService.LogWarning ("Error reading provisioning profile directory '{0}': {1}", profileDir, ex);
+					allDirectoriesRead = false;
+					continue;
+				}
 
-					foreach (var fileName in Directory.EnumerateFiles (profileDir)) {
-						if (!fileName.EndsWith (".mobileprovision", StringComparison.OrdinalIgnoreCase) && !fileName.EndsWith (".provisionprofile", StringComparison.OrdinalIgnoreCase))
-							continue;
+				foreach (var fileName in fileNames) {
+					if (!fileName.EndsWith (".mobileprovision", StringComparison.OrdinalIgnoreCase) && !fileName.EndsWith (".provisionprofile", StringComparison.OrdinalIgnoreCase))
+						continue;
 
-						try {
-							var profile = ProvisioningProfile.Load (fileName);
-							index.ProvisioningProfiles.Add (profile);
-						} catch (Exception ex) {
-							LoggingService.LogWarning ("Error reading provisioning profile '{0}': {1}", fileName, ex);
-							index.UnindexedProfileFiles.Add (new UnindexedProfileFile (fileName));
-						}
+					try {
+						var profile = ProvisioningProfile.Load (fileName);
+						index.ProvisioningProfiles.Add (profile);
+					} catch (Exception ex) {
+						LoggingService.LogWarning ("Error reading provisioning profile '{0}': {1}", fileName, ex);
+						index.UnindexedProfileFiles.Add (new UnindexedProfileFile (fileName));
 					}
-				} else {
-					Directory.CreateDirectory (profileDir);
 				}
 			}
 
 			index.ProvisioningProfiles.Sort (CreationDateComparer);
 			index.Version = IndexVersion;
-			index.LastModified = mtime;
+			// Retry skipped directories even if restoring access doesn't change their modification time.
+			index.LastModified = allDirectoriesRead ? mtime : DateTime.MinValue;
 
 			index.Save (indexName);
 
