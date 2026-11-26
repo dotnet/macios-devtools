@@ -234,6 +234,36 @@ namespace Tests {
 			}
 		}
 
+		[Test]
+		public void OpenIndex_SkipsMissingProfileDirectoryAndIndexesItWhenCreated ()
+		{
+			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
+			try {
+				var existingDir = Path.Combine (tmpdir, "existing");
+				var missingDir = Path.Combine (tmpdir, "missing");
+				var indexPath = Path.Combine (tmpdir, "profiles.index");
+				Directory.CreateDirectory (existingDir);
+				WriteProfile (Path.Combine (existingDir, "Existing.mobileprovision"), "Existing", "EXISTING-UUID", DateTime.UtcNow, DateTime.UtcNow.AddDays (10));
+
+				var index = MobileProvisionIndex.CreateIndex (new [] { existingDir, missingDir }, indexPath);
+				Assert.That (Directory.Exists (missingDir), Is.False);
+
+				MobileProvisionIndex.OpenIndex (new [] { existingDir, missingDir }, indexPath);
+				Assert.That (Directory.Exists (missingDir), Is.False);
+
+				Directory.CreateDirectory (missingDir);
+				WriteProfile (Path.Combine (missingDir, "New.mobileprovision"), "New", "NEW-UUID", DateTime.UtcNow, DateTime.UtcNow.AddDays (10));
+				Directory.SetLastWriteTimeUtc (missingDir, index.LastModified.AddMinutes (-1));
+
+				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "New", new [] { existingDir, missingDir }, indexPath);
+
+				Assert.That (profile?.Uuid, Is.EqualTo ("NEW-UUID"));
+			} finally {
+				if (Directory.Exists (tmpdir))
+					Directory.Delete (tmpdir, true);
+			}
+		}
+
 #if NET10_0_OR_GREATER
 		[TestCase (false, false)]
 		[TestCase (false, true)]
@@ -248,6 +278,7 @@ namespace Tests {
 			var tmpdir = Path.Combine (Path.GetTempPath (), Path.GetRandomFileName ());
 			var unreadableDir = Path.Combine (tmpdir, "unreadable");
 			var permissions = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+			var log = new tests.RecordingLogger ();
 			try {
 				var readableDir = Path.Combine (tmpdir, "readable");
 				var indexPath = Path.Combine (tmpdir, "profiles.index");
@@ -265,13 +296,17 @@ namespace Tests {
 				File.SetUnixFileMode (unreadableDir, UnixFileMode.None);
 				Assert.That (() => Directory.GetFiles (unreadableDir), Throws.TypeOf<UnauthorizedAccessException> (), "The test directory must be unreadable.");
 
+				LoggingService.SetCustomLogger (log);
 				var profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Profile", dirs, indexPath);
 				Assert.That (profile?.Uuid, Is.EqualTo ("READABLE-UUID"));
+				Assert.That (log.Messages, Has.Some.StartsWith ($"Error reading provisioning profile directory '{unreadableDir}'"));
+				Assert.That (log.Warnings, Has.None.StartsWith ($"Error reading provisioning profile directory '{unreadableDir}'"));
 
 				File.SetUnixFileMode (unreadableDir, permissions);
 				profile = MobileProvisionIndex.GetMobileProvision (MobileProvisionPlatform.iOS, "Profile", dirs, indexPath);
 				Assert.That (profile?.Uuid, Is.EqualTo ("UNREADABLE-UUID"), "Retry the skipped directory even when its modification time has not changed.");
 			} finally {
+				LoggingService.SetCustomLogger (null);
 				if (Directory.Exists (unreadableDir))
 					File.SetUnixFileMode (unreadableDir, permissions);
 				if (Directory.Exists (tmpdir))
